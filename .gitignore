@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Project specific
+google_creds.json
+results.csv
+sites.csv
+test_logic.py
+.ipynb_checkpoints/
+
+# Scrapy
+.scrapy/
+
+# Windows
+Thumbs.db
+desktop.ini

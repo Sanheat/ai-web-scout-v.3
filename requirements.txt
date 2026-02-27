@@ -1,0 +1,5 @@
+scrapy
+beautifulsoup4
+openai
+gspread
+oauth2client
