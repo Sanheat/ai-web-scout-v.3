@@ -2,7 +2,12 @@ import streamlit as st
 import pandas as pd
 import subprocess
 import os
-from llm_validator import get_keywords_from_query
+
+# Пытаемся импортировать функцию, если файл llm_validator существует
+try:
+    from llm_validator import get_keywords_from_query
+except ImportError:
+    st.error("Файл llm_validator.py не найден!")
 
 st.set_page_config(page_title="AI Web Scout", page_icon="🔎", layout="wide")
 
@@ -26,51 +31,71 @@ if st.button("🚀 Запустить поиск и анализ", use_container
     else:
         # Очистка старых файлов перед запуском
         for f in ["results.csv", "sites.csv"]:
-            if os.path.exists(f): os.remove(f)
+            if os.path.exists(f): 
+                try:
+                    os.remove(f)
+                except:
+                    pass
         
         sites = [s.strip() for s in sites_input.split('\n') if s.strip()]
+        # Создаем временный файл со списком сайтов для паука
         pd.DataFrame(sites, columns=['site']).to_csv("sites.csv", index=False)
 
-        # 1. Ключевые слова
+        # 1. Генерация ключевых слов через LLM
         with st.spinner("Генерация ключевых слов..."):
-            keywords_list = get_keywords_from_query(user_query, api_key)
-            keywords_str = ",".join(keywords_list)
-            st.info(f"🔎 Ключи: {keywords_str}")
+            try:
+                keywords_list = get_keywords_from_query(user_query, api_key)
+                keywords_str = ",".join(keywords_list)
+                st.info(f"🔎 Ключевые слова для поиска: {keywords_str}")
+            except Exception as e:
+                st.error(f"Ошибка при генерации ключевых слов: {e}")
+                st.stop()
 
-        # 2. ЗАПУСК SCRAPY (с флагом -o для автоматического создания CSV)
+        # 2. ЗАПУСК SCRAPY
         os.environ["OPENAI_API_KEY"] = api_key
+        # Добавляем путь к sites.csv, чтобы паук знал, что парсить
         cmd = [
             "scrapy", "crawl", "site_spider", 
+            "-a", f"sites_file=sites.csv",
             "-a", f"user_query={user_query}", 
             "-a", f"keywords={keywords_str}",
-            "-a", f"api_key={api_key}",
-            "-o", "results.csv"  # ЗАСТАВЛЯЕМ SCRAPY ПИСАТЬ ВСЕ ПОЛЯ САМОМУ
+            "-o", "results.csv" 
         ]
 
-        with st.spinner("Робот в процессе..."):
+        with st.spinner("Робот обходит сайты..."):
             process = subprocess.run(cmd, capture_output=True, text=True)
-            if process.stderr:
-                with st.expander("📝 Логи"): st.code(process.stderr)
+            # Если есть критические ошибки в консоли - показываем их
+            if process.returncode != 0:
+                st.error("Произошла ошибка при работе паука:")
+                st.code(process.stderr)
 
         # 3. ОБРАБОТКА РЕЗУЛЬТАТОВ
         if os.path.exists("results.csv"):
-            df_res = pd.read_csv("results.csv")
-            
-            # Проверяем, есть ли колонка index (теперь она точно будет)
-            if 'index' in df_res.columns:
-                # Превращаем в числа и сортируем
-                df_res['index'] = pd.to_numeric(df_res['index'])
-                df_res = df_res.sort_values(by="index")
+            try:
+                df_res = pd.read_csv("results.csv")
                 
-                st.success(f"Готово! Обработано сайтов: {len(df_res)}")
-                
-                # Убираем колонку index из отображения, оставляем только суть
-                final_df = df_res[["site", "result"]].reset_index(drop=True)
-                st.dataframe(final_df, use_container_width=True)
+                if df_res.empty:
+                    st.warning("Поиск завершен, но подходящая информация на сайтах не найдена.")
+                else:
+                    # Если есть колонка index, сортируем по ней
+                    if 'index' in df_res.columns:
+                        df_res['index'] = pd.to_numeric(df_res['index'], errors='coerce')
+                        df_res = df_res.sort_values(by="index")
+                    
+                    st.success(f"Готово! Найдено совпадений: {len(df_res)}")
+                    
+                    # Показываем таблицу (выбираем нужные колонки, если они есть)
+                    cols_to_show = [c for c in ["site", "result"] if c in df_res.columns]
+                    final_df = df_res[cols_to_show].reset_index(drop=True)
+                    st.dataframe(final_df, use_container_width=True)
 
-                csv_data = final_df.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Скачать CSV", csv_data, "scout_results.csv", "text/csv")
-            else:
-                st.error("Колонка 'index' не найдена в результатах. Проверь SiteSpider.")
+                    # Кнопка скачивания
+                    csv_data = final_df.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Скачать результаты (CSV)", csv_data, "scout_results.csv", "text/csv")
+                    
+            except pd.errors.EmptyDataError:
+                st.warning("Робот закончил работу, но файл результатов пуст (ничего не найдено).")
+            except Exception as e:
+                st.error(f"Ошибка при чтении результатов: {e}")
         else:
-            st.warning("Результаты не записаны.")
+            st.error("Файл результатов не был создан. Возможно, паук не смог запуститься.")
