@@ -62,12 +62,19 @@ if st.button("🚀 Запустить поиск и анализ", use_container
             "-o", "results.csv" 
         ]
 
-        with st.spinner("Робот обходит сайты..."):
+        with st.spinner("Робот обходит сайты... это может занять несколько минут"):
             process = subprocess.run(cmd, capture_output=True, text=True)
-            # Если есть критические ошибки в консоли - показываем их
+            
+            # ВАЖНО: Всегда показываем логи, чтобы понимать, что происходит внутри
+            with st.expander("📝 Посмотреть детальный лог работы паука (Scrapy Logs)"):
+                if process.stderr:
+                    st.code(process.stderr)
+                if process.stdout:
+                    st.code(process.stdout)
+            
+            # Если код завершения не равен 0, значит произошла критическая ошибка
             if process.returncode != 0:
-                st.error("Произошла ошибка при работе паука:")
-                st.code(process.stderr)
+                st.error(f"Произошла критическая ошибка (Код завершения: {process.returncode}). Проверьте логи выше.")
 
         # 3. ОБРАБОТКА РЕЗУЛЬТАТОВ
         if os.path.exists("results.csv"):
@@ -98,4 +105,4 @@ if st.button("🚀 Запустить поиск и анализ", use_container
             except Exception as e:
                 st.error(f"Ошибка при чтении результатов: {e}")
         else:
-            st.error("Файл результатов не был создан. Возможно, паук не смог запуститься.")
+            st.error("Файл результатов не был создан. Возможно, конфигурация паука нарушена. Посмотрите логи выше.")
