@@ -92,7 +92,8 @@ if st.button("🚀 Запустить поиск и анализ", use_container
                     st.success(f"Готово! Найдено совпадений: {len(df_res)}")
                     
                     # Показываем таблицу (выбираем нужные колонки, если они есть)
-                    cols_to_show = [c for c in ["site", "result"] if c in df_res.columns]
+                    cols_to_show = [c for c in ["site", "result", "source_url"] if c in df_res.columns]
+
                     final_df = df_res[cols_to_show].reset_index(drop=True)
                     st.dataframe(final_df, use_container_width=True)
 
