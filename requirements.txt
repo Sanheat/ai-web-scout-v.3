@@ -1,5 +1,8 @@
+streamlit
+pandas
 scrapy
 beautifulsoup4
 openai
 gspread
 oauth2client
+markdownify
