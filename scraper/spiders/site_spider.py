@@ -7,7 +7,7 @@ import sys
 class SiteSpider(scrapy.Spider):
     name = "site_spider"
     
-        def __init__(self, sites_file=None, user_query=None, keywords=None, *args, **kwargs):
+    def __init__(self, sites_file=None, user_query=None, keywords=None, *args, **kwargs):
         super(SiteSpider, self).__init__(*args, **kwargs)
         self.query = user_query
         self.keywords = [k.strip().lower() for k in keywords.split(",")] if keywords else []
