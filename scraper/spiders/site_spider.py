@@ -15,7 +15,9 @@ class SiteSpider(scrapy.Spider):
         
         # Счетчик страниц для каждого сайта
         self.page_counts = {}
-        self.MAX_PAGES_PER_SITE = 25
+        # Агрессивный лимит страниц на домен: фокус на главной и ключевых разделах
+        # (about/contact/team и т.п.), чтобы не уходить глубоко в блог/новости.
+        self.MAX_PAGES_PER_SITE = 5
 
         if sites_file:
             import pandas as pd
@@ -88,6 +90,14 @@ class SiteSpider(scrapy.Spider):
                 'контакт', 'нас', 'команд', 'связь', 'инфо', 'компани'
             ]
             target_words = base_target_words + self.keywords
+
+            # Разделы, которые почти никогда не несут нужную инфу для обогащения
+            # (блоги, новости, вакансии и т.п.) — их агрессивно отсекаем.
+            blacklist_path_tokens = [
+                'blog', 'news', 'press', 'stories', 'articles',
+                'career', 'careers', 'jobs', 'job', 'vacanc', 'hiring',
+                'events'
+            ]
             
             seen_urls = set()
             
@@ -99,9 +109,16 @@ class SiteSpider(scrapy.Spider):
                     continue
                     
                 absolute_url = response.urljoin(link)
+
+                parsed = urlparse(absolute_url)
+                path_lower = parsed.path.lower()
                 
                 # Переходим только по внутренним страницам (того же домена)
-                if urlparse(absolute_url).netloc == domain and absolute_url not in seen_urls:
+                if parsed.netloc == domain and absolute_url not in seen_urls:
+                    # Агрессивно отсекаем заведомо нерелевантные разделы.
+                    if any(token in path_lower for token in blacklist_path_tokens):
+                        continue
+
                     seen_urls.add(absolute_url)
                     
                     link_lower = absolute_url.lower()

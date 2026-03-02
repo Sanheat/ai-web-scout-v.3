@@ -2,18 +2,22 @@ BOT_NAME = 'scraper'
 SPIDER_MODULES = ['scraper.spiders']
 NEWSPIDER_MODULE = 'scraper.spiders'
 
-# Глубина поиска: 1 (главная + ссылки на ней). 
+# Глубина поиска: 1–2 уровня (главная + базовые внутренние ссылки).
 # Этого достаточно для большинства задач без ухода в дебри маркетплейсов.
 DEPTH_LIMIT = 2
 
 # --- СЕКЦИЯ СКОРОСТИ И АНОНИМНОСТИ ---
-# Задержка между запросами
-DOWNLOAD_DELAY = 1.5
+# Агрессивная настройка задержки между запросами:
+# минимальная задержка даёт максимальную скорость, а RANDOMIZE_DOWNLOAD_DELAY
+# немного размывает паттерн запросов.
+DOWNLOAD_DELAY = 0.1
 RANDOMIZE_DOWNLOAD_DELAY = True
 
 # Настройки параллелизма
-CONCURRENT_REQUESTS = 32
-CONCURRENT_REQUESTS_PER_DOMAIN = 2
+# Высокий общий параллелизм и увеличенный лимит по домену
+# позволяют быстрее пройти сотни сайтов.
+CONCURRENT_REQUESTS = 96
+CONCURRENT_REQUESTS_PER_DOMAIN = 12
 DOWNLOAD_TIMEOUT = 15
 
 # Повторы при ошибках
