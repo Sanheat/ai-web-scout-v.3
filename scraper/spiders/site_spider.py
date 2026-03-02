@@ -1,8 +1,7 @@
 import scrapy
 from scrapy import signals
 from urllib.parse import urlparse
-import os
-import sys
+
 
 class SiteSpider(scrapy.Spider):
     name = "site_spider"
@@ -15,7 +14,7 @@ class SiteSpider(scrapy.Spider):
         self.initial_sites = []
         
         # Счетчик страниц для каждого сайта
-        self.page_counts = {} 
+        self.page_counts = {}
         self.MAX_PAGES_PER_SITE = 25
 
         if sites_file:
@@ -58,54 +57,26 @@ class SiteSpider(scrapy.Spider):
         if site_data['site'] in self.handled_sites:
             return
 
-        # --- ШАГ 1: ЛОГИКА ПОИСКА С LLM ---
+        # --- ШАГ 1: ЛЕГКИЙ ТЕКСТОВЫЙ ПОИСК БЕЗ LLM ---
         content = response.text.lower()
         found = any(keyword in content for keyword in self.keywords)
 
         if found:
-            # Добавляем корневую папку проекта в пути для Python
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            if project_root not in sys.path:
-                sys.path.append(project_root)
-                
-            from llm_validator import validate_with_llm
-            api_key = os.getenv("OPENAI_API_KEY")
-            
-            if api_key:
-                self.logger.info(f"🔎 Найдено совпадение по словам на: {response.url}. Запускаем ИИ-чтение...")
-                
-                # Заставляем ИИ прочитать текст страницы и поискать ответ
-                extracted_data = validate_with_llm(
-                    html_content=response.text, 
-                    url=response.url, 
-                    user_query=self.query, 
-                    api_key=api_key
-                )
-                
-                # Если ИИ нашел конкретный ответ и он не 'NO'
-                if extracted_data and extracted_data.upper() != "NO":
-                    self.logger.info(f"✅ Успех! ИИ извлек данные с {response.url}")
-                    self.handled_sites.add(site_data['site'])
-                    
-                    yield {
-                        'index': site_data.get('index', 0),
-                        'site': site_data['site'],
-                        'result': extracted_data,
-                        'source_url': response.url
-                    }
-                    return
-                else:
-                    self.logger.info(f"🤖 Совадения по словам были, но ИИ не нашел точного ответа на {response.url}. Ищем дальше.")
-            else:
-                self.logger.error("❌ OPENAI_API_KEY не установлен!")
-                self.handled_sites.add(site_data['site'])
-                yield {
-                    'index': site_data.get('index', 0),
-                    'site': site_data['site'],
-                    'result': response.url,
-                    'source_url': response.url
-                }
-                return
+            # Сохраняем первую подходящую страницу для последующей LLM-обработки во второй стадии
+            self.logger.info(
+                f"🔎 Найдено совпадение по словам на: {response.url}. "
+                f"Сохраняем страницу для отложенной LLM-обработки."
+            )
+            self.handled_sites.add(site_data['site'])
+
+            yield {
+                'index': site_data.get('index', 0),
+                'site': site_data['site'],
+                'page_url': response.url,
+                'html': response.text,
+                'user_query': self.query,
+            }
+            return
 
         # --- ШАГ 2: УМНАЯ НАВИГАЦИЯ ПО САЙТУ ---
         if self.page_counts[domain] < self.MAX_PAGES_PER_SITE:

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import subprocess
 import os
+import sys
 
 # Пытаемся импортировать функцию, если файл llm_validator существует
 try:
@@ -44,11 +45,18 @@ if st.button("🚀 Запустить поиск и анализ", use_container
                     os.remove(f)
                 except:
                     pass
+        # Удаляем промежуточные файлы предыдущих запусков
+        for filename in os.listdir("."):
+            if filename.startswith("sites_chunk_") or filename.startswith("pages_for_llm_part_") or filename == "pages_for_llm.jl":
+                try:
+                    os.remove(filename)
+                except:
+                    pass
         
         sites = [s.strip() for s in sites_input.split('\n') if s.strip()]
         total_sites = len(sites)
 
-        # Создаем временный файл со списком сайтов для паука
+        # Создаем единый файл со списком сайтов (используется только для финального JOIN-а и отладки)
         pd.DataFrame(sites, columns=['site']).to_csv("sites.csv", index=False)
 
         # 1. Генерация ключевых слов через LLM
@@ -61,29 +69,87 @@ if st.button("🚀 Запустить поиск и анализ", use_container
                 st.error(f"Ошибка при генерации ключевых слов: {e}")
                 st.stop()
 
-        # 2. ЗАПУСК SCRAPY
-        os.environ["OPENAI_API_KEY"] = api_key
-        cmd = [
-            "scrapy", "crawl", "site_spider", 
-            "-a", f"sites_file=sites.csv",
-            "-a", f"user_query={user_query}", 
-            "-a", f"keywords={keywords_str}",
-            "-o", "results.csv" 
-        ]
+        # 2. STAGE 1 — ПАРАЛЛЕЛЬНЫЙ КРАУЛИНГ (шардинг по доменам)
+        CHUNK_SIZE = 50  # Количество доменов на один экземпляр краулера
 
-        with st.spinner("Робот обходит сайты... это может занять несколько минут"):
-            process = subprocess.run(cmd, capture_output=True, text=True)
-            
-            with st.expander("📝 Посмотреть детальный лог работы паука (Scrapy Logs)"):
-                if process.stderr:
-                    st.code(process.stderr)
-                if process.stdout:
-                    st.code(process.stdout)
-            
-            if process.returncode != 0:
-                st.error(f"Произошла критическая ошибка (Код завершения: {process.returncode}). Проверьте логи выше.")
+        # Делим исходный список доменов на чанки
+        chunks = [sites[i:i + CHUNK_SIZE] for i in range(0, total_sites, CHUNK_SIZE)] or []
 
-        # 3. ОБРАБОТКА РЕЗУЛЬТАТОВ
+        crawler_processes = []
+        candidate_files = []
+
+        with st.spinner("Stage 1: роботы обходят сайты (быстрый краулинг)..."):
+            for idx, chunk in enumerate(chunks):
+                chunk_filename = f"sites_chunk_{idx}.csv"
+                pd.DataFrame(chunk, columns=['site']).to_csv(chunk_filename, index=False)
+
+                output_file = f"pages_for_llm_part_{idx}.jl"
+                cmd = [
+                    "scrapy",
+                    "crawl",
+                    "site_spider",
+                    "-a",
+                    f"sites_file={chunk_filename}",
+                    "-a",
+                    f"user_query={user_query}",
+                    "-a",
+                    f"keywords={keywords_str}",
+                    "-o",
+                    output_file,
+                ]
+
+                candidate_files.append(output_file)
+                crawler_processes.append(
+                    subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                )
+
+            logs_stdout = []
+            logs_stderr = []
+
+            for process in crawler_processes:
+                out, err = process.communicate()
+                if out:
+                    logs_stdout.append(out)
+                if err:
+                    logs_stderr.append(err)
+
+        with st.expander("📝 Посмотреть детальный лог работы пауков (Scrapy Logs)"):
+            if logs_stderr:
+                st.code("\n".join(logs_stderr))
+            if logs_stdout:
+                st.code("\n".join(logs_stdout))
+
+        if any(process.returncode != 0 for process in crawler_processes):
+            st.error("Произошла критическая ошибка при работе одного из краулеров. Проверьте логи выше.")
+
+        # 3. STAGE 2 — LLM-ОБРАБОТКА КАНДИДАТОВ
+        if candidate_files:
+            with st.spinner("Stage 2: ИИ обрабатывает найденные страницы..."):
+                worker_cmd = [
+                    sys.executable,
+                    "run_llm_workers.py",
+                    "--inputs",
+                    *candidate_files,
+                    "--output",
+                    "results.csv",
+                    "--api_key",
+                    api_key,
+                    "--max-workers",
+                    "4",
+                ]
+                worker_process = subprocess.run(worker_cmd, capture_output=True, text=True)
+
+                # Показываем лог воркеров при необходимости
+                if worker_process.stderr:
+                    st.code(worker_process.stderr)
+
+                if worker_process.returncode != 0:
+                    st.error(
+                        f"Во время работы LLM-воркеров произошла ошибка (код {worker_process.returncode}). "
+                        f"Подробности смотрите в логах выше."
+                    )
+
+        # 4. ОБРАБОТКА РЕЗУЛЬТАТОВ
         # Базовый датафрейм из ВСЕХ доменов в исходном порядке пользователя
         df_all = pd.DataFrame(sites, columns=['site'])
 
