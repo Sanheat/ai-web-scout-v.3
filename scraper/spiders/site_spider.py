@@ -21,7 +21,7 @@ class SiteSpider(scrapy.Spider):
 
         if sites_file:
             import pandas as pd
-            df = pd.read_csv(sites_file)
+            df = pd.read_csv(sites_file).dropna(subset=['site'])
             self.initial_sites = df.to_dict('records')
 
     @classmethod
@@ -32,17 +32,30 @@ class SiteSpider(scrapy.Spider):
 
     def start_requests(self):
         for site_data in self.initial_sites:
-            url = site_data['site']
+            url = site_data.get('site')
+
+            # Пропускаем пустые записи или NaN (float), которые ломают startswith
+            if not url or not isinstance(url, str):
+                self.logger.warning(f"Пропущена некорректная запись домена: {url}")
+                continue
+
+            url = url.strip()
+            if not url:
+                continue
+
             if not url.startswith(('http://', 'https://')):
                 url = 'https://' + url
-            
+
             # Инициализируем счетчик для этого сайта
             domain = urlparse(url).netloc
+            if not domain:
+                continue
+
             self.page_counts[domain] = 0
-            
+
             yield scrapy.Request(
-                url, 
-                callback=self.parse, 
+                url,
+                callback=self.parse,
                 errback=self.handle_error,
                 meta={'site_data': site_data, 'depth': 0},
                 dont_filter=True
@@ -90,14 +103,6 @@ class SiteSpider(scrapy.Spider):
                 'контакт', 'нас', 'команд', 'связь', 'инфо', 'компани'
             ]
             target_words = base_target_words + self.keywords
-
-            # Разделы, которые почти никогда не несут нужную инфу для обогащения
-            # (блоги, новости, вакансии и т.п.) — их агрессивно отсекаем.
-            blacklist_path_tokens = [
-                'blog', 'news', 'press', 'stories', 'articles',
-                'career', 'careers', 'jobs', 'job', 'vacanc', 'hiring',
-                'events'
-            ]
             
             seen_urls = set()
             
