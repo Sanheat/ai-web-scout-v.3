@@ -136,6 +136,8 @@ if st.button("🚀 Запустить поиск и анализ", use_container
                     api_key,
                     "--max-workers",
                     "4",
+                    "--max-pages-per-site",
+                    "4",
                 ]
                 worker_process = subprocess.run(worker_cmd, capture_output=True, text=True)
 

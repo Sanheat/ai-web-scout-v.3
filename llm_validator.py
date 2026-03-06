@@ -46,9 +46,10 @@ def validate_with_llm(html_content, url, user_query, api_key):
     # 1. Подстановка данных в запрос
     final_query = substitute_placeholders(user_query, url)
     
-    # 2. Очистка контента: удаляем технический мусор через BeautifulSoup
+    # 2. Очистка контента: удаляем технический мусор через BeautifulSoup.
+    # footer НЕ удаляем — там часто указано название компании и копирайт (© ООО «Название»).
     soup = BeautifulSoup(html_content, "html.parser")
-    for element in soup(["script", "style", "nav", "footer", "meta", "link", "noscript", "svg", "button", "input"]):
+    for element in soup(["script", "style", "nav", "meta", "link", "noscript", "svg", "button", "input"]):
         element.decompose()
         
     # 3. Конвертируем очищенный HTML в чистый Markdown
