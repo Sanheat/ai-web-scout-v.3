@@ -103,7 +103,15 @@ class SiteSpider(scrapy.Spider):
                 'контакт', 'нас', 'команд', 'связь', 'инфо', 'компани'
             ]
             target_words = base_target_words + self.keywords
-            
+
+            # Разделы, которые почти никогда не несут нужную инфу для обогащения
+            # (блоги, новости, вакансии и т.п.) — их агрессивно отсекаем.
+            blacklist_path_tokens = [
+                'blog', 'news', 'press', 'stories', 'articles',
+                'career', 'careers', 'jobs', 'job', 'vacanc', 'hiring',
+                'events'
+            ]
+
             seen_urls = set()
             
             for a in a_elements:
