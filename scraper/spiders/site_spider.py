@@ -30,6 +30,14 @@ class SiteSpider(scrapy.Spider):
         crawler.signals.connect(spider.spider_idle, signal=signals.spider_idle)
         return spider
 
+    async def start(self):
+        # Scrapy >= 2.13 использует async-метод start() как точку входа и
+        # больше не вызывает start_requests() автоматически. Переиспользуем
+        # существующую синхронную логику, сохраняя совместимость со старыми
+        # версиями (там по-прежнему работает start_requests()).
+        for request in self.start_requests():
+            yield request
+
     def start_requests(self):
         for site_data in self.initial_sites:
             url = site_data.get('site')
