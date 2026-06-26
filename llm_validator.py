@@ -40,7 +40,7 @@ def get_keywords_from_query(user_query, api_key):
     except:
         return [user_query.lower()]
 
-def validate_with_llm(html_content, url, user_query, api_key):
+def validate_with_llm(html_content, url, user_query, api_key, model="gpt-4o-mini"):
     """Очищает HTML в Markdown и проверяет наличие информации с помощью ИИ. Возвращает строгий JSON."""
     
     # 1. Подстановка данных в запрос
@@ -84,7 +84,7 @@ Do not include any extra text."""
     client = openai.OpenAI(api_key=api_key)
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             response_format={"type": "json_object"}, # 🔥 Включаем режим строгой отдачи JSON
             messages=messages,
             temperature=0

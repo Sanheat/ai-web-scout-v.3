@@ -32,7 +32,7 @@ def load_candidates(input_files: List[str]) -> List[Dict[str, Any]]:
     return candidates
 
 
-def process_site(site: str, records: List[Dict[str, Any]], api_key: str, max_pages_per_site: int = 2) -> Dict[str, Any]:
+def process_site(site: str, records: List[Dict[str, Any]], api_key: str, max_pages_per_site: int = 2, model: str = "gpt-4o-mini") -> Dict[str, Any]:
     """
     Обрабатывает всех кандидатов для одного домена, вызывая LLM последовательно,
     пока не найдется уверенный результат или не будет исчерпан лимит страниц.
@@ -57,6 +57,7 @@ def process_site(site: str, records: List[Dict[str, Any]], api_key: str, max_pag
             url=url,
             user_query=user_query,
             api_key=api_key,
+            model=model,
         )
 
         if extracted:
