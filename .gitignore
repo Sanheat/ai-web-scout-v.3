@@ -9,6 +9,10 @@ venv/
 google_creds.json
 results.csv
 sites.csv
+scout.db
+scout.db-journal
+scout.db-wal
+scout.db-shm
 test_logic.py
 .ipynb_checkpoints/
 
