@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Web Scout · Clay-style prototype</title>
+<style>
+  :root{
+    --bg:#fbfbfc;
+    --surface:#ffffff;
+    --line:#ececef;
+    --line-strong:#e0e0e6;
+    --ink:#1b1b1f;
+    --ink-2:#5c5c66;
+    --ink-3:#8a8a96;
+    --accent:#5b50e6;
+    --accent-soft:#eeecfd;
+    --accent-ink:#4136c4;
+    --green:#1a9c5b;
+    --green-soft:#e6f6ee;
+    --amber:#b5740a;
+    --amber-soft:#fcf2df;
+    --red:#cf3b3b;
+    --red-soft:#fcebeb;
+    --row-h:46px;
+    --col-w:300px;
+    --domain-w:280px;
+    --idx-w:46px;
+    --shadow:0 1px 2px rgba(20,20,40,.05),0 8px 24px rgba(20,20,40,.08);
+    --shadow-pop:0 12px 40px rgba(20,20,40,.16);
+    --radius:10px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:var(--font);
+    color:var(--ink);
+    background:var(--bg);
+    font-size:13.5px;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button{font-family:inherit}
+
+  /* ---------- App shell ---------- */
+  .app{display:flex;height:100vh;width:100vw}
+
+  /* ---------- Left rail ---------- */
+  .rail{
+    width:56px;flex:0 0 56px;background:#17171c;
+    display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:8px;
+  }
+  .rail .logo{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(135deg,#6a5cf0,#8e7bff);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;
+    box-shadow:0 4px 12px rgba(91,80,230,.5);margin-bottom:8px;
+  }
+  .rail .ri{
+    width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:#9a9aa6;font-size:17px;cursor:pointer;transition:.15s;
+  }
+  .rail .ri:hover{background:#262630;color:#fff}
+  .rail .ri.active{background:#2c2b3a;color:#fff}
+  .rail .spacer{flex:1}
+  .rail .avatar{width:30px;height:30px;border-radius:50%;background:#3a3a46;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+
+  /* ---------- Main ---------- */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+
+  /* Top bar */
+  .topbar{
+    height:54px;flex:0 0 54px;background:var(--surface);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;padding:0 16px;gap:12px;
+  }
+  .crumbs{display:flex;align-items:center;gap:7px;color:var(--ink-3);font-size:13px}
+  .crumbs .sep{color:#c8c8d0}
+  .table-name{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;color:var(--ink)}
+  .table-name .ic{width:24px;height:24px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px}
+  .table-name .chev{color:var(--ink-3);font-size:11px}
+  .topbar .spacer{flex:1}
+  .pill-people{display:flex;align-items:center}
+  .pill-people .a{width:26px;height:26px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;margin-left:-7px}
+  .btn{
+    height:32px;border:1px solid var(--line-strong);background:#fff;border-radius:8px;
+    padding:0 12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink);font-size:13px;font-weight:500;transition:.12s;
+  }
+  .btn:hover{background:#f7f7f9;border-color:#d3d3db}
+  .btn .ic{font-size:13px}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(91,80,230,.3)}
+  .btn-primary:hover{background:#4f44d8;border-color:#4f44d8}
+  .btn-ghost{border-color:transparent;background:transparent}
+  .btn-ghost:hover{background:#f1f1f4}
+
+  /* Toolbar (views + filters) */
+  .toolbar{
+    height:44px;flex:0 0 44px;background:var(--surface);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;padding:0 12px;gap:6px;
+  }
+  .views{display:flex;align-items:center;gap:2px}
+  .view-tab{
+    height:30px;padding:0 11px;border-radius:7px;display:flex;align-items:center;gap:6px;
+    color:var(--ink-2);font-size:13px;cursor:pointer;font-weight:500;
+  }
+  .view-tab.active{background:var(--accent-soft);color:var(--accent-ink)}
+  .view-tab:not(.active):hover{background:#f3f3f6}
+  .toolbar .spacer{flex:1}
+  .chiplet{
+    height:29px;padding:0 9px;border-radius:7px;display:flex;align-items:center;gap:6px;
+    color:var(--ink-2);font-size:12.5px;cursor:pointer;
+  }
+  .chiplet:hover{background:#f3f3f6}
+  .chiplet .ic{opacity:.7}
+  .vsep{width:1px;height:20px;background:var(--line);margin:0 4px}
+  .count-pill{font-size:12px;color:var(--ink-3);padding:0 6px}
+
+  /* ---------- Grid ---------- */
+  .grid-wrap{flex:1;overflow:auto;position:relative;background:var(--bg)}
+  table.grid{border-collapse:separate;border-spacing:0;min-width:max-content}
+  .grid th,.grid td{
+    border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+    height:var(--row-h);vertical-align:middle;background:var(--surface);
+  }
+  .grid thead th{
+    position:sticky;top:0;z-index:30;height:38px;background:#fafafb;
+    border-bottom:1px solid var(--line-strong);
+    font-weight:500;color:var(--ink-2);font-size:12.5px;padding:0;
+    user-select:none;
+  }
+
+  /* index col */
+  .col-idx{width:var(--idx-w);min-width:var(--idx-w);max-width:var(--idx-w);text-align:center;color:var(--ink-3);font-size:12px;
+    position:sticky;left:0;z-index:20;}
+  thead .col-idx{z-index:40}
+  .row .col-idx .num{display:inline}
+  .row:hover .col-idx .num{display:none}
+  .row .col-idx .check{display:none}
+  .row:hover .col-idx .check{display:inline;color:var(--ink-3);cursor:pointer}
+
+  /* domain col (frozen) */
+  .col-domain{
+    width:var(--domain-w);min-width:var(--domain-w);max-width:var(--domain-w);
+    position:sticky;left:var(--idx-w);z-index:20;
+  }
+  thead .col-domain{z-index:40}
+  .col-domain.shadow,.col-idx.shadow{box-shadow:8px 0 12px -8px rgba(20,20,40,.12)}
+
+  .dh{display:flex;align-items:center;gap:8px;padding:0 12px;height:100%}
+  .dh .tic{width:18px;height:18px;border-radius:5px;background:#eef0ff;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px}
+  .dh .lbl{font-weight:600;color:var(--ink);font-size:13px}
+  .dh .cnt{color:var(--ink-3);font-weight:400;font-size:12px}
+
+  .domain-cell{display:flex;align-items:center;gap:10px;padding:0 12px;height:100%;cursor:default}
+  .favicon{width:22px;height:22px;border-radius:6px;flex:0 0 22px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;letter-spacing:-.5px}
+  .domain-meta{min-width:0}
+  .domain-name{font-weight:600;color:var(--ink);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .domain-sub{font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* prompt col header */
+  .ph{display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;height:100%;cursor:pointer;position:relative}
+  .ph:hover{background:#f3f3f6}
+  .ph .tic{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 20px}
+  .ph .pmeta{min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center;line-height:1.25}
+  .ph .pname{font-weight:600;color:var(--ink);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ph .pmodel{font-size:10.5px;color:var(--ink-3);display:flex;align-items:center;gap:4px;white-space:nowrap}
+  .ph .dot{width:4px;height:4px;border-radius:50%;background:#cfcfd8}
+  .ph .gear{opacity:0;color:var(--ink-3);font-size:14px;padding:3px;border-radius:6px;transition:.12s}
+  .ph:hover .gear{opacity:1}
+  .ph .gear:hover{background:#e8e8ee;color:var(--ink)}
+
+  /* add column header */
+  .col-add{width:120px;min-width:120px}
+  .add-col-btn{display:flex;align-items:center;justify-content:center;gap:6px;height:100%;color:var(--ink-3);cursor:pointer;font-size:13px;font-weight:500}
+  .add-col-btn:hover{background:#f3f3f6;color:var(--accent)}
+  td.col-add{background:var(--bg);border-right:none}
+
+  /* value cells */
+  .vc{padding:0 12px;height:100%;display:flex;align-items:center;font-size:13px;cursor:default;position:relative}
+  .vc .val{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .vc.empty{color:#c2c2cc}
+  .vc:hover{background:#fcfcfd}
+  .tag{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;max-width:100%}
+  .tag .vtxt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tag.found{background:var(--green-soft);color:var(--green)}
+  .tag.miss{background:var(--red-soft);color:var(--red)}
+  .src{margin-left:6px;color:var(--ink-3);font-size:11px;flex:0 0 auto}
+  .src a{color:var(--accent);text-decoration:none}
+  .src a:hover{text-decoration:underline}
+
+  .spinner{width:13px;height:13px;border:2px solid #ddd;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex:0 0 13px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .running-txt{color:var(--accent);font-size:12.5px;margin-left:8px}
+
+  .add-row-bar{display:flex;align-items:center;gap:8px;padding:0 12px;height:40px;color:var(--ink-3);cursor:pointer;font-size:13px;position:sticky;left:0;background:var(--surface);border-bottom:1px solid var(--line)}
+  .add-row-bar:hover{color:var(--accent)}
+
+  /* ---------- Popover (column config) ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(20,20,35,.28);z-index:100;display:none;align-items:center;justify-content:center}
+  .overlay.show{display:flex}
+  .panel{
+    width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 80px);overflow:auto;
+    background:#fff;border-radius:14px;box-shadow:var(--shadow-pop);
+    display:flex;flex-direction:column;
+  }
+  .panel-head{padding:18px 20px 0;display:flex;align-items:flex-start;gap:12px}
+  .panel-head .picon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 36px}
+  .panel-head h3{margin:0;font-size:16px;font-weight:600}
+  .panel-head p{margin:3px 0 0;font-size:12.5px;color:var(--ink-3)}
+  .panel-head .x{margin-left:auto;cursor:pointer;color:var(--ink-3);font-size:18px;padding:4px;border-radius:6px}
+  .panel-head .x:hover{background:#f1f1f4;color:var(--ink)}
+  .panel-body{padding:16px 20px 4px;display:flex;flex-direction:column;gap:14px}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+  .field .hint{font-size:11.5px;color:var(--ink-3);font-weight:400;margin-top:5px}
+  input.inp,select.inp,textarea.inp{
+    width:100%;border:1px solid var(--line-strong);border-radius:9px;padding:9px 11px;font-size:13.5px;color:var(--ink);font-family:inherit;background:#fff;outline:none;transition:.12s;
+  }
+  input.inp:focus,textarea.inp:focus,select.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  textarea.inp{resize:vertical;min-height:120px;line-height:1.5}
+  .row2{display:flex;gap:10px}
+  .row2 .field{flex:1}
+  .icon-pick{display:flex;gap:6px;flex-wrap:wrap}
+  .icon-opt{width:34px;height:34px;border-radius:8px;border:1px solid var(--line-strong);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;background:#fff}
+  .icon-opt:hover{border-color:var(--accent)}
+  .icon-opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+  .vars{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+  .var{font-size:11.5px;background:#f1f0fc;color:var(--accent-ink);border:1px solid #e1ddfa;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:ui-monospace,Menlo,monospace}
+  .var:hover{background:#e7e4fb}
+  .panel-foot{padding:14px 20px 18px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:8px}
+  .panel-foot .spacer{flex:1}
+  .danger-link{color:var(--red);font-size:12.5px;cursor:pointer;font-weight:500}
+  .danger-link:hover{text-decoration:underline}
+
+  /* template chooser cards */
+  .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tpl{border:1px solid var(--line-strong);border-radius:11px;padding:12px;cursor:pointer;transition:.12s;display:flex;gap:10px;align-items:flex-start}
+  .tpl:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(91,80,230,.12)}
+  .tpl .ti{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 30px}
+  .tpl .tt{font-weight:600;font-size:13px;margin-bottom:2px}
+  .tpl .td{font-size:11.5px;color:var(--ink-3);line-height:1.4}
+
+  /* small menu */
+  .menu{position:fixed;z-index:120;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-pop);padding:5px;min-width:190px;display:none}
+  .menu.show{display:block}
+  .menu .mi{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;font-size:13px;color:var(--ink);cursor:pointer}
+  .menu .mi:hover{background:#f3f3f6}
+  .menu .mi.danger{color:var(--red)}
+  .menu .mi.danger:hover{background:var(--red-soft)}
+  .menu .msep{height:1px;background:var(--line);margin:4px 6px}
+  .menu .mi .ic{width:16px;text-align:center;color:var(--ink-3)}
+  .menu .mi.danger .ic{color:var(--red)}
+
+  /* toast */
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#1b1b22;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;box-shadow:var(--shadow-pop);opacity:0;transition:.25s;z-index:200;display:flex;align-items:center;gap:9px;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast .dotg{width:7px;height:7px;border-radius:50%;background:#4ade80}
+
+  /* cell detail drawer */
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:400px;max-width:90vw;background:#fff;box-shadow:var(--shadow-pop);z-index:110;transform:translateX(100%);transition:.25s;display:flex;flex-direction:column}
+  .drawer.show{transform:translateX(0)}
+  .drawer-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .drawer-head .x{margin-left:auto;cursor:pointer;color:var(--ink-3);font-size:18px;padding:4px;border-radius:6px}
+  .drawer-head .x:hover{background:#f1f1f4}
+  .drawer-body{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+  .dlabel{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);margin-bottom:6px}
+  .dvalue{font-size:14px;color:var(--ink);line-height:1.5}
+  .dcard{border:1px solid var(--line);border-radius:10px;padding:13px;background:#fcfcfd}
+  .dcard .src-line{font-size:12px;color:var(--ink-3);margin-top:8px;display:flex;align-items:center;gap:6px}
+  .promptbox{background:#faf9ff;border:1px solid #ebe8fb;border-radius:10px;padding:12px;font-size:12.5px;color:var(--ink-2);line-height:1.55;white-space:pre-wrap}
+
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Left rail -->
+  <div class="rail">
+    <div class="logo">🔎</div>
+    <div class="ri active" title="Таблицы">▦</div>
+    <div class="ri" title="Источники">◇</div>
+    <div class="ri" title="Энричменты">✦</div>
+    <div class="ri" title="Воркфлоу">⇄</div>
+    <div class="spacer"></div>
+    <div class="ri" title="Настройки">⚙</div>
+    <div class="avatar">SH</div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="crumbs">
+        <span>Воркспейс</span><span class="sep">/</span><span>Лидген Q2</span>
+      </div>
+      <span class="sep" style="color:#c8c8d0">/</span>
+      <div class="table-name">
+        <span class="ic">▦</span>
+        <span>Анализ доменов · 6</span>
+        <span class="chev">▾</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="pill-people">
+        <div class="a" style="background:#6a5cf0">SH</div>
+        <div class="a" style="background:#1a9c5b">AK</div>
+        <div class="a" style="background:#b5740a">+2</div>
+      </div>
+      <button class="btn"><span class="ic">↳</span> Экспорт</button>
+      <button class="btn btn-primary" id="runAll"><span class="ic">▶</span> Запустить все</button>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="views">
+        <div class="view-tab active">▦ Таблица</div>
+        <div class="view-tab">▢ Карточки</div>
+        <div class="view-tab">＋ Вид</div>
+      </div>
+      <div class="vsep"></div>
+      <div class="chiplet"><span class="ic">⊟</span> Фильтр</div>
+      <div class="chiplet"><span class="ic">⇅</span> Сортировка</div>
+      <div class="chiplet"><span class="ic">▤</span> Группировка</div>
+      <div class="spacer"></div>
+      <div class="count-pill" id="statLine">6 доменов · 3 промпта</div>
+      <div class="chiplet"><span class="ic">⌕</span> Поиск</div>
+    </div>
+
+    <!-- Grid -->
+    <div class="grid-wrap" id="gridWrap">
+      <table class="grid">
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="bodyRows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Column config / template overlay -->
+<div class="overlay" id="overlay">
+  <div class="panel" id="panel"></div>
+</div>
+
+<!-- Header context menu -->
+<div class="menu" id="colMenu"></div>
+
+<!-- Cell drawer -->
+<div class="drawer" id="drawer"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span class="dotg"></span><span id="toastMsg"></span></div>
+
+<script>
+/* ============================================================
+   AI Web Scout — Clay-style prototype (mock, no backend)
+   ============================================================ */
+
+const favColors = ['#6a5cf0','#1a9c5b','#e0883a','#d9534f','#2a9fd6','#8e44ad','#16a085','#c0397b'];
+
+const state = {
+  domains: [
+    {id:'d1', name:'cashy.ru',        sub:'Финтех · Москва'},
+    {id:'d2', name:'brandlift.io',    sub:'SaaS · Берлин'},
+    {id:'d3', name:'norvik-tech.com', sub:'Промышленность · Рига'},
+    {id:'d4', name:'greenleaf.eco',   sub:'GreenTech · Амстердам'},
+    {id:'d5', name:'apex-logistics.kz', sub:'Логистика · Алматы'},
+    {id:'d6', name:'lumen-studio.design', sub:'Агентство · Лиссабон'},
+  ],
+  columns: [
+    {id:'c1', name:'Email отдела продаж', icon:'✉️', color:'#1a9c5b', model:'gpt-4o-mini',
+     prompt:'Найди на сайте {{Website}} контактный email отдела продаж или общий email для коммерческих запросов. Верни только адрес.'},
+    {id:'c2', name:'Имя руководителя', icon:'👤', color:'#6a5cf0', model:'gpt-4o',
+     prompt:'Найди имя генерального директора / основателя компании {{Company Name}}. Верни ФИО и должность.'},
+    {id:'c3', name:'Стек технологий', icon:'🧩', color:'#e0883a', model:'gpt-4o-mini',
+     prompt:'Определи, какие технологии и интеграции упоминает {{Company Name}} на сайте (CRM, платёжные системы, фреймворки).'},
+  ],
+  cells: {}, // key: domainId::columnId -> {status:'empty'|'running'|'found'|'miss', value, source}
+};
+
+/* ---- mock enrichment generators keyed loosely by column intent ---- */
+const mockBank = {
+  email: ['sales@{d}','hello@{d}','partners@{d}','b2b@{d}','info@{d}'],
+  person: ['Артём Соколов · CEO','Мария Линд · Co-founder','Дмитрий Орлов · CEO','Sofia Almeida · Managing Director','Нурлан Жакупов · CEO'],
+  tech: ['Salesforce, Stripe, React','HubSpot, AWS, Next.js','Bitrix24, ЮKassa, Vue','Pipedrive, GCP, Angular','amoCRM, Tinkoff Pay, Svelte'],
+  phone: ['+7 495 120-44-90','+49 30 5557 220','+371 6700 1180','+31 20 808 5512','+7 727 350-12-00'],
+  address: ['Москва, Пресненская наб. 12','Berlin, Friedrichstraße 68','Rīga, Brīvības iela 40','Amsterdam, Herengracht 182','Алматы, пр. Абая 150'],
+  revenue: ['$2.4M ARR','€5.1M выручка 2024','$870K seed','€12M Series A','$3.3M ARR'],
+  generic: ['Найдено на странице /about','Указано в футере сайта','Со страницы контактов','Из раздела «Команда»','Блок «Реквизиты»'],
+};
+function intentOf(col){
+  const t=(col.name+' '+col.prompt).toLowerCase();
+  if(/email|почт|mail/.test(t))return'email';
+  if(/руковод|директор|ceo|основ|founder|имя|команд/.test(t))return'person';
+  if(/технолог|стек|интеграц|crm|tech/.test(t))return'tech';
+  if(/телефон|phone|звон/.test(t))return'phone';
+  if(/адрес|офис|address|город/.test(t))return'address';
+  if(/выручк|revenue|оборот|arr|доход/.test(t))return'revenue';
+  return'generic';
+}
+const srcPages=['/contacts','/about','/team','/company','/o-nas','/pricing'];
+
+let seed=7;
+function rnd(){seed=(seed*9301+49297)%233280;return seed/233280;}
+
+function cellKey(d,c){return d+'::'+c;}
+function getCell(d,c){return state.cells[cellKey(d,c)]||{status:'empty'};}
+function setCell(d,c,v){state.cells[cellKey(d,c)]=v;}
+
+/* ---------------- rendering ---------------- */
+function favFor(name,i){
+  const c=favColors[i%favColors.length];
+  return `<span class="favicon" style="background:${c}">${name[0].toUpperCase()}</span>`;
+}
+
+function renderHead(){
+  const tr=document.getElementById('headRow');
+  let h='';
+  h+=`<th class="col-idx" id="thIdx"></th>`;
+  h+=`<th class="col-domain" id="thDomain"><div class="dh"><span class="tic">@</span><span class="lbl">Домен</span><span class="cnt">${state.domains.length}</span></div></th>`;
+  state.columns.forEach(col=>{
+    h+=`<th class="col-prompt" data-col="${col.id}" style="width:var(--col-w);min-width:var(--col-w)">
+      <div class="ph" data-open="${col.id}">
+        <span class="tic" style="background:${col.color}1f;color:${col.color}">${col.icon}</span>
+        <span class="pmeta">
+          <span class="pname">${esc(col.name)}</span>
+          <span class="pmodel">Промпт <span class="dot"></span> ${col.model}</span>
+        </span>
+        <span class="gear" data-menu="${col.id}">⋯</span>
+      </div>
+    </th>`;
+  });
+  h+=`<th class="col-add"><div class="add-col-btn" id="addColBtn">＋ Столбец</div></th>`;
+  tr.innerHTML=h;
+
+  tr.querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',e=>{
+    if(e.target.closest('[data-menu]'))return;
+    openColumnConfig(el.getAttribute('data-open'));
+  }));
+  tr.querySelectorAll('[data-menu]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();openColMenu(el.getAttribute('data-menu'),el);
+  }));
+  document.getElementById('addColBtn').addEventListener('click',openTemplateChooser);
+}
+
+function renderBody(){
+  const tb=document.getElementById('bodyRows');
+  let h='';
+  state.domains.forEach((d,i)=>{
+    h+=`<tr class="row" data-row="${d.id}">`;
+    h+=`<td class="col-idx"><span class="num">${i+1}</span><span class="check">☑</span></td>`;
+    h+=`<td class="col-domain">
+        <div class="domain-cell">
+          ${favFor(d.name,i)}
+          <div class="domain-meta">
+            <div class="domain-name">${esc(d.name)}</div>
+            <div class="domain-sub">${esc(d.sub)}</div>
+          </div>
+        </div>
+      </td>`;
+    state.columns.forEach(col=>{
+      h+=`<td class="col-prompt" style="width:var(--col-w);min-width:var(--col-w)">${cellHtml(d.id,col.id)}</td>`;
+    });
+    h+=`<td class="col-add"></td>`;
+    h+=`</tr>`;
+  });
+  // add-row
+  h+=`<tr><td class="col-idx"></td><td class="col-domain" colspan="1"><div class="add-row-bar" id="addRowBar">＋ Добавить домен</div></td>`;
+  state.columns.forEach(()=>h+=`<td></td>`);
+  h+=`<td class="col-add"></td></tr>`;
+  tb.innerHTML=h;
+
+  tb.querySelectorAll('.col-prompt').forEach(td=>{
+    td.addEventListener('click',()=>{
+      const tr=td.closest('tr');const dId=tr.getAttribute('data-row');
+      const idx=[...tr.children].indexOf(td)-2;
+      const col=state.columns[idx];
+      if(col)openCellDrawer(dId,col.id);
+    });
+  });
+  const arb=document.getElementById('addRowBar');
+  if(arb)arb.addEventListener('click',addDomain);
+}
+
+function cellHtml(dId,cId){
+  const cell=getCell(dId,cId);
+  if(cell.status==='running')
+    return `<div class="vc"><div class="spinner"></div><span class="running-txt">анализ…</span></div>`;
+  if(cell.status==='found')
+    return `<div class="vc"><span class="tag found"><span class="vtxt">${esc(cell.value)}</span></span><span class="src"><a href="#" onclick="return false">${esc(cell.source)}</a></span></div>`;
+  if(cell.status==='miss')
+    return `<div class="vc"><span class="tag miss">не найдено</span></div>`;
+  return `<div class="vc empty">＋ запустить</div>`;
+}
+
+function renderStat(){
+  document.getElementById('statLine').textContent=`${state.domains.length} доменов · ${state.columns.length} промпта`;
+  const tn=document.querySelector('.table-name span:nth-child(2)');
+  if(tn)tn.textContent=`Анализ доменов · ${state.domains.length}`;
+}
+
+function renderAll(){renderHead();renderBody();renderStat();updateFrozenShadow();}
+
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+
+/* ---------------- run / enrich simulation ---------------- */
+function runColumn(cId){
+  const col=state.columns.find(c=>c.id===cId);
+  const intent=intentOf(col);
+  state.domains.forEach((d,i)=>{
+    setCell(d.id,cId,{status:'running'});
+    refreshCell(d.id,cId);
+    const delay=400+rnd()*1400+i*120;
+    setTimeout(()=>{
+      const miss=rnd()<0.12;
+      if(miss){setCell(d.id,cId,{status:'miss'});}
+      else{
+        const bank=mockBank[intent];
+        let v=bank[Math.floor(rnd()*bank.length)].replace('{d}',d.name);
+        const src=srcPages[Math.floor(rnd()*srcPages.length)];
+        setCell(d.id,cId,{status:'found',value:v,source:d.name+src});
+      }
+      refreshCell(d.id,cId);
+    },delay);
+  });
+  toast(`Запущен промпт «${col.name}» по ${state.domains.length} доменам`);
+}
+
+function runAll(){state.columns.forEach(c=>runColumn(c.id));}
+
+function refreshCell(dId,cId){
+  const tr=document.querySelector(`tr[data-row="${dId}"]`);
+  if(!tr)return;
+  const idx=state.columns.findIndex(c=>c.id===cId);
+  const td=tr.querySelectorAll('.col-prompt')[idx];
+  if(td)td.innerHTML=cellHtml(dId,cId);
+}
+
+/* ---------------- column config panel ---------------- */
+const ICONS=['✉️','👤','🧩','📞','📍','💰','🏢','🔗','⭐','📊','🧠','🌐'];
+
+function openColumnConfig(cId){
+  const col=state.columns.find(c=>c.id===cId);
+  const isNew=!col;
+  const c=col||{id:'c'+(Date.now()),name:'',icon:'🧠',color:'#6a5cf0',model:'gpt-4o-mini',prompt:''};
+  const panel=document.getElementById('panel');
+  panel.innerHTML=`
+    <div class="panel-head">
+      <div class="picon" style="background:${c.color}1f;color:${c.color}">${c.icon}</div>
+      <div>
+        <h3>${isNew?'Новый промпт-столбец':'Настройка столбца'}</h3>
+        <p>Каждый столбец — независимый промпт, обогащающий все домены своим контекстом.</p>
+      </div>
+      <div class="x" id="panelClose">✕</div>
+    </div>
+    <div class="panel-body">
+      <div class="field">
+        <label>Название столбца</label>
+        <input class="inp" id="fName" placeholder="Напр. Email отдела продаж" value="${esc(c.name)}">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Модель</label>
+          <select class="inp" id="fModel">
+            <option ${c.model==='gpt-4o-mini'?'selected':''}>gpt-4o-mini</option>
+            <option ${c.model==='gpt-4o'?'selected':''}>gpt-4o</option>
+            <option ${c.model==='o3-mini'?'selected':''}>o3-mini</option>
+            <option ${c.model==='claude-haiku-4-5'?'selected':''}>claude-haiku-4-5</option>
+          </select>
+        </div>
+        <div class="field" style="flex:0 0 auto">
+          <label>Иконка</label>
+          <div class="icon-pick" id="iconPick">
+            ${ICONS.slice(0,6).map(ic=>`<div class="icon-opt ${ic===c.icon?'sel':''}" data-ic="${ic}">${ic}</div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Промпт / ТЗ для нейросети</label>
+        <textarea class="inp" id="fPrompt" placeholder="Опиши, что именно извлечь со страницы домена…">${esc(c.prompt)}</textarea>
+        <div class="hint">Подставляются автоматически:</div>
+        <div class="vars">
+          <span class="var" data-var="{{Website}}">{{Website}}</span>
+          <span class="var" data-var="{{Company Name}}">{{Company Name}}</span>
+          <span class="var" data-var="{{Domain}}">{{Domain}}</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel-foot">
+      ${isNew?'':'<span class="danger-link" id="delCol">Удалить столбец</span>'}
+      <div class="spacer"></div>
+      <button class="btn" id="panelCancel">Отмена</button>
+      <button class="btn btn-primary" id="panelSave">${isNew?'Создать столбец':'Сохранить'}</button>
+    </div>`;
+  showOverlay();
+
+  let chosenIcon=c.icon;
+  panel.querySelectorAll('[data-ic]').forEach(el=>el.addEventListener('click',()=>{
+    panel.querySelectorAll('[data-ic]').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');chosenIcon=el.getAttribute('data-ic');
+    panel.querySelector('.picon').textContent=chosenIcon;
+  }));
+  panel.querySelectorAll('[data-var]').forEach(el=>el.addEventListener('click',()=>{
+    const ta=document.getElementById('fPrompt');
+    ta.value+=(ta.value&&!ta.value.endsWith(' ')?' ':'')+el.getAttribute('data-var');
+    ta.focus();
+  }));
+  document.getElementById('panelClose').onclick=hideOverlay;
+  document.getElementById('panelCancel').onclick=hideOverlay;
+  const del=document.getElementById('delCol');if(del)del.onclick=()=>{deleteColumn(cId);hideOverlay();};
+  document.getElementById('panelSave').onclick=()=>{
+    const name=document.getElementById('fName').value.trim()||'Без названия';
+    const prompt=document.getElementById('fPrompt').value.trim();
+    const model=document.getElementById('fModel').value;
+    if(isNew){
+      state.columns.push({id:c.id,name,icon:chosenIcon,color:randColor(),model,prompt});
+      renderAll();toast(`Создан столбец «${name}»`);
+      // auto-run new column for instant feedback
+      setTimeout(()=>runColumn(c.id),250);
+    }else{
+      Object.assign(col,{name,icon:chosenIcon,model,prompt});
+      renderAll();toast('Изменения сохранены');
+    }
+    hideOverlay();
+  };
+}
+
+/* ---------------- template chooser ---------------- */
+const TEMPLATES=[
+  {icon:'✉️',color:'#1a9c5b',name:'Email для связи',model:'gpt-4o-mini',prompt:'Найди контактный email на сайте {{Website}}. Приоритет: отдел продаж, затем общий. Верни только адрес.'},
+  {icon:'👤',color:'#6a5cf0',name:'Лицо, принимающее решение',model:'gpt-4o',prompt:'Найди имя и должность руководителя/основателя компании {{Company Name}}. Верни «ФИО · должность».'},
+  {icon:'📞',color:'#2a9fd6',name:'Телефон',model:'gpt-4o-mini',prompt:'Извлеки контактный телефон компании {{Company Name}} в международном формате.'},
+  {icon:'📍',color:'#e0883a',name:'Адрес офиса',model:'gpt-4o-mini',prompt:'Найди физический адрес главного офиса {{Company Name}}.'},
+  {icon:'💰',color:'#16a085',name:'Выручка / стадия',model:'gpt-4o',prompt:'Оцени выручку или стадию финансирования {{Company Name}} по информации на сайте и в новостях.'},
+  {icon:'🧩',color:'#8e44ad',name:'Технологии и интеграции',model:'gpt-4o-mini',prompt:'Какие технологии, CRM и платёжные системы использует {{Company Name}}?'},
+  {icon:'🧠',color:'#5b50e6',name:'Свой промпт',model:'gpt-4o-mini',prompt:'',blank:true},
+];
+function openTemplateChooser(){
+  const panel=document.getElementById('panel');
+  panel.innerHTML=`
+    <div class="panel-head">
+      <div class="picon" style="background:var(--accent-soft);color:var(--accent)">＋</div>
+      <div><h3>Добавить промпт-столбец</h3><p>Начни с шаблона или создай свой ТЗ с нуля.</p></div>
+      <div class="x" id="panelClose">✕</div>
+    </div>
+    <div class="panel-body">
+      <div class="tpl-grid">
+        ${TEMPLATES.map((t,i)=>`
+          <div class="tpl" data-tpl="${i}">
+            <div class="ti" style="background:${t.color}1f;color:${t.color}">${t.icon}</div>
+            <div><div class="tt">${t.name}</div><div class="td">${t.blank?'Чистое поле — задай инструкцию сам':esc(t.prompt).slice(0,68)+'…'}</div></div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="panel-foot"><div class="spacer"></div><button class="btn" id="panelCancel">Отмена</button></div>`;
+  showOverlay();
+  document.getElementById('panelClose').onclick=hideOverlay;
+  document.getElementById('panelCancel').onclick=hideOverlay;
+  panel.querySelectorAll('[data-tpl]').forEach(el=>el.addEventListener('click',()=>{
+    const t=TEMPLATES[+el.getAttribute('data-tpl')];
+    if(t.blank){openColumnConfig(null);return;}
+    const id='c'+Date.now();
+    state.columns.push({id,name:t.name,icon:t.icon,color:t.color,model:t.model,prompt:t.prompt});
+    renderAll();hideOverlay();toast(`Создан столбец «${t.name}»`);
+    setTimeout(()=>runColumn(id),250);
+  }));
+}
+
+/* ---------------- column header menu ---------------- */
+function openColMenu(cId,anchor){
+  const m=document.getElementById('colMenu');
+  m.innerHTML=`
+    <div class="mi" data-act="run"><span class="ic">▶</span> Запустить столбец</div>
+    <div class="mi" data-act="edit"><span class="ic">✎</span> Настроить промпт</div>
+    <div class="mi" data-act="dup"><span class="ic">⧉</span> Дублировать</div>
+    <div class="mi" data-act="clear"><span class="ic">⌫</span> Очистить значения</div>
+    <div class="msep"></div>
+    <div class="mi danger" data-act="del"><span class="ic">🗑</span> Удалить столбец</div>`;
+  const r=anchor.getBoundingClientRect();
+  m.style.left=Math.min(r.left,window.innerWidth-210)+'px';
+  m.style.top=(r.bottom+6)+'px';
+  m.classList.add('show');
+  m.querySelectorAll('[data-act]').forEach(el=>el.onclick=()=>{
+    const a=el.getAttribute('data-act');m.classList.remove('show');
+    if(a==='run')runColumn(cId);
+    if(a==='edit')openColumnConfig(cId);
+    if(a==='dup')duplicateColumn(cId);
+    if(a==='clear')clearColumn(cId);
+    if(a==='del')deleteColumn(cId);
+  });
+}
+document.addEventListener('click',e=>{
+  const m=document.getElementById('colMenu');
+  if(m.classList.contains('show')&&!m.contains(e.target)&&!e.target.closest('[data-menu]'))m.classList.remove('show');
+});
+
+function duplicateColumn(cId){
+  const col=state.columns.find(c=>c.id===cId);
+  const idx=state.columns.indexOf(col);
+  const copy={...col,id:'c'+Date.now(),name:col.name+' (копия)'};
+  state.columns.splice(idx+1,0,copy);
+  renderAll();toast('Столбец продублирован');
+}
+function clearColumn(cId){
+  state.domains.forEach(d=>setCell(d.id,cId,{status:'empty'}));
+  renderBody();toast('Значения очищены');
+}
+function deleteColumn(cId){
+  state.columns=state.columns.filter(c=>c.id!==cId);
+  state.domains.forEach(d=>delete state.cells[cellKey(d.id,cId)]);
+  renderAll();toast('Столбец удалён');
+}
+
+/* ---------------- add domain ---------------- */
+function addDomain(){
+  const name=prompt('Добавить домен (например acme.com):');
+  if(!name)return;
+  const id='d'+Date.now();
+  state.domains.push({id,name:name.trim(),sub:'Новый домен'});
+  renderAll();
+  toast(`Домен ${name.trim()} добавлен`);
+}
+
+/* ---------------- cell drawer ---------------- */
+function openCellDrawer(dId,cId){
+  const d=state.domains.find(x=>x.id===dId);
+  const col=state.columns.find(x=>x.id===cId);
+  const cell=getCell(dId,cId);
+  const dr=document.getElementById('drawer');
+  let valBlock;
+  if(cell.status==='found')valBlock=`<div class="dcard"><div class="dvalue">${esc(cell.value)}</div><div class="src-line">↳ источник: <a href="#" onclick="return false" style="color:var(--accent)">${esc(cell.source)}</a></div></div>`;
+  else if(cell.status==='miss')valBlock=`<div class="dcard"><div class="dvalue" style="color:var(--red)">Информация не найдена на сайте</div></div>`;
+  else if(cell.status==='running')valBlock=`<div class="dcard"><div class="dvalue" style="color:var(--accent)">Идёт анализ страниц…</div></div>`;
+  else valBlock=`<div class="dcard"><div class="dvalue" style="color:var(--ink-3)">Ещё не запускалось</div></div>`;
+  dr.innerHTML=`
+    <div class="drawer-head">
+      <span class="tic" style="width:24px;height:24px;border-radius:7px;background:${col.color}1f;color:${col.color};display:flex;align-items:center;justify-content:center">${col.icon}</span>
+      <div><div style="font-weight:600">${esc(col.name)}</div><div style="font-size:12px;color:var(--ink-3)">${esc(d.name)}</div></div>
+      <div class="x" id="drawerClose">✕</div>
+    </div>
+    <div class="drawer-body">
+      <div><div class="dlabel">Результат</div>${valBlock}</div>
+      <div><div class="dlabel">Промпт этого столбца</div>
+        <div class="promptbox">${esc(col.prompt||'(промпт не задан)')}</div></div>
+      <div><div class="dlabel">Параметры</div>
+        <div class="dvalue" style="font-size:13px;color:var(--ink-2)">Модель: <b>${col.model}</b><br>Домен: <b>${esc(d.name)}</b> · ${esc(d.sub)}</div></div>
+      <button class="btn btn-primary" id="rerunCell" style="width:100%;justify-content:center">▶ Перезапустить по этому домену</button>
+    </div>`;
+  dr.classList.add('show');
+  document.getElementById('drawerClose').onclick=()=>dr.classList.remove('show');
+  document.getElementById('rerunCell').onclick=()=>{
+    setCell(dId,cId,{status:'running'});refreshCell(dId,cId);
+    const intent=intentOf(col);
+    setTimeout(()=>{
+      const bank=mockBank[intent];let v=bank[Math.floor(rnd()*bank.length)].replace('{d}',d.name);
+      setCell(dId,cId,{status:'found',value:v,source:d.name+srcPages[Math.floor(rnd()*srcPages.length)]});
+      refreshCell(dId,cId);openCellDrawer(dId,cId);
+    },900);
+  };
+}
+
+/* ---------------- overlay / toast / misc ---------------- */
+function showOverlay(){document.getElementById('overlay').classList.add('show');}
+function hideOverlay(){document.getElementById('overlay').classList.remove('show');}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')hideOverlay();});
+
+let toastT;
+function toast(msg){
+  const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);
+}
+function randColor(){return favColors[Math.floor(rnd()*favColors.length)];}
+
+function updateFrozenShadow(){
+  const w=document.getElementById('gridWrap');
+  const on=w.scrollLeft>2;
+  document.querySelectorAll('.col-domain,#thIdx,.col-idx').forEach(el=>el.classList.toggle('shadow',on));
+}
+document.getElementById('gridWrap').addEventListener('scroll',updateFrozenShadow);
+
+document.getElementById('runAll').addEventListener('click',runAll);
+
+/* ---------------- boot ---------------- */
+renderAll();
+// pre-fill first column so the grid doesn't look empty on open
+setTimeout(()=>runColumn('c1'),500);
+</script>
+</body>
+</html>
