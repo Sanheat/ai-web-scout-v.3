@@ -49,8 +49,19 @@ def _require_auth():
     if not AUTH_PASS:
         return None  # пароль не настроен — пускаем (локальная разработка)
     a = request.authorization
-    if a and a.username == AUTH_USER and hmac.compare_digest(a.password or "", AUTH_PASS):
+    ok = False
+    if a and a.username == AUTH_USER:
+        try:
+            # Сравниваем в байтах: hmac.compare_digest со str падает на не-ASCII
+            ok = hmac.compare_digest(
+                (a.password or "").encode("utf-8"),
+                AUTH_PASS.encode("utf-8"),
+            )
+        except Exception:
+            ok = False  # любая ошибка → не пускаем, но и не 500
+    if ok:
         return None
+    # Неверные/отсутствующие данные → 401, браузер снова покажет окно логина
     return Response(
         "Требуется авторизация", 401,
         {"WWW-Authenticate": 'Basic realm="AI Web Scout", charset="UTF-8"'},
