@@ -91,15 +91,58 @@ journalctl -u scout -f               # смотреть лог
 | **Fly.io** | ~$2–3/мес (есть кредиты) | Нет (min 1 machine) | Использует наш `Dockerfile`, постоянный том. Очень дёшево |
 | **Render Free / Vercel** | Бесплатно | **Да / serverless** | Засыпает, эфемерный диск, таймауты — для долгого краулинга **не годится** |
 
-**Рекомендация:** **Oracle Cloud Always Free** — бесплатно, не засыпает,
-постоянный диск, OpenAI доступен. Это обычный Ubuntu-VM, поэтому установка —
-тем же скриптом, что и для VPS (см. раздел про VPS выше):
+### Oracle Cloud Always Free — пошагово ⭐
 
+**Что получится:** постоянно работающий сервис по адресу `http://ВАШ_IP`
+(или своему домену), под паролем, OpenAI доступен, вся работа в `scout.db` и
+переживает перезапуски. Стоимость — 0 ₽.
+
+**1. Регистрация.** https://cloud.oracle.com → *Start for free*. Нужна
+банковская карта (только верификация, без списания) и телефон. Домашний регион
+выбирай поближе (например, Frankfurt или Amsterdam) — потом не меняется.
+
+**2. Создать VM.** Menu → *Compute* → *Instances* → *Create instance*:
+- **Image:** Canonical Ubuntu 22.04.
+- **Shape:** *Ampere* (ARM, Always Free) — `VM.Standard.A1.Flex`, например
+  2 OCPU / 12 ГБ (в лимит Always Free входит до 4 OCPU / 24 ГБ суммарно).
+  Если пишет *Out of capacity* — попробуй позже, другой Availability Domain,
+  или возьми Always Free AMD `VM.Standard.E2.1.Micro` (слабее, но хватает).
+- **SSH:** загрузи свой публичный ключ (или сгенерируй и скачай приватный).
+- Создай и запомни **Public IP**.
+
+**3. Открыть порты — главный подводный камень Oracle (два фаервола!).**
+- *Security List:* Networking → VCN → Subnet → Security List → *Add Ingress
+  Rules*: Source `0.0.0.0/0`, TCP порт `80` (и `443` для HTTPS).
+- *На самой VM* (Ubuntu-образ Oracle по умолчанию режет входящие через iptables):
+  ```bash
+  sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+  sudo apt-get install -y iptables-persistent && sudo netfilter-persistent save
+  ```
+
+**4. Установить сервис** (по SSH):
 ```bash
-apt-get update && apt-get install -y git
-git clone https://github.com/Sanheat/ai-web-scout-v.3.git /opt/ai-web-scout
-bash /opt/ai-web-scout/deploy/setup-vps.sh
+ssh ubuntu@ВАШ_IP
+sudo apt-get update && sudo apt-get install -y git
+sudo git clone https://github.com/Sanheat/ai-web-scout-v.3.git /opt/ai-web-scout
+sudo bash /opt/ai-web-scout/deploy/setup-vps.sh
+sudo nano /opt/ai-web-scout/scout.env      # OPENAI_API_KEY, SCOUT_PASSWORD
+sudo systemctl restart scout
 ```
+
+**5. Указать IP/домен в nginx:**
+```bash
+sudo nano /etc/nginx/sites-available/scout  # server_name = ВАШ_IP или домен
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**6. Открыть** `http://ВАШ_IP` → логин `scout` / твой пароль. Готово.
+
+**7. (Опционально) домен + HTTPS:** направь A-запись домена на IP, затем
+`sudo apt-get install -y certbot python3-certbot-nginx && sudo certbot --nginx -d твой-домен`.
+
+> Always Free VM не останавливается сама. Повторный запуск `setup-vps.sh`
+> безопасен — он сделает `git pull` и обновит сервис.
 
 ### Open-source решения (self-hosted PaaS)
 
