@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scout — Поиск компаний + AI-обогащение (объединённый прототип)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     DESIGN TOKENS  — same system as scout-clay-ui.html
+     teal primary + orange accent (+ indigo for "source" layer)
+     ============================================================ */
+  :root {
+    --primary:        #0D9488;
+    --primary-600:    #0F766E;
+    --primary-700:    #115E59;
+    --on-primary:     #FFFFFF;
+    --secondary:      #14B8A6;
+    --accent:         #EA580C;
+    --accent-600:     #C2410C;
+
+    /* "источник / поиск компаний" layer = indigo */
+    --source:         #6366F1;
+    --source-600:     #4F46E5;
+    --source-bg:      #EEF0FE;
+
+    --bg:             #F7F8F9;
+    --surface:        #FFFFFF;
+    --surface-2:      #FBFCFD;
+    --fg:             #0F172A;
+    --fg-soft:        #475569;
+    --muted:          #94A3B8;
+    --muted-bg:       #F1F5F9;
+    --border:         #E5E8EC;
+    --border-strong:  #D3D9DF;
+    --ring:           #0D9488;
+
+    --found:          #0D9488;
+    --found-bg:       #ECFDF8;
+    --notfound:       #DC2626;
+    --notfound-bg:    #FEF2F2;
+    --pending:        #94A3B8;
+    --running:        #2563EB;
+    --running-bg:     #EFF4FF;
+
+    --radius:         10px;
+    --radius-sm:      7px;
+    --shadow-sm:      0 1px 2px rgba(15,23,42,.05);
+    --shadow:         0 4px 14px rgba(15,23,42,.08);
+    --shadow-lg:      0 12px 40px rgba(15,23,42,.16);
+
+    --row-h:          46px;
+    --domain-w:       250px;
+
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  html[data-theme="dark"] {
+    --bg:             #0B1015;
+    --surface:        #121922;
+    --surface-2:      #0F161E;
+    --fg:             #E6EDF3;
+    --fg-soft:        #9FB0BE;
+    --muted:          #6B7E8C;
+    --muted-bg:       #1A222C;
+    --border:         #232D38;
+    --border-strong:  #313D49;
+    --source-bg:      #18203A;
+    --found-bg:       #0C2722;
+    --notfound-bg:    #2A1414;
+    --running-bg:     #11203A;
+    --shadow-sm:      0 1px 2px rgba(0,0,0,.4);
+    --shadow:         0 4px 14px rgba(0,0,0,.5);
+    --shadow-lg:      0 12px 40px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--fg);
+    font-size: 14px; line-height: 1.45;
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+  button { font-family: inherit; cursor: pointer; }
+  ::-webkit-scrollbar { height: 11px; width: 11px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ============================================================ SHELL */
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    height: 56px; padding: 0 16px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    flex-shrink: 0; z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--source), var(--primary));
+    display: grid; place-items: center; color: #fff; flex-shrink: 0; box-shadow: var(--shadow-sm);
+  }
+  .brand .logo svg { width: 18px; height: 18px; }
+  .brand .ver { font-size: 11px; font-weight: 500; color: var(--muted); border: 1px solid var(--border); padding: 1px 6px; border-radius: 20px; margin-left: 2px; }
+  .topbar .divider { width: 1px; height: 26px; background: var(--border); }
+  .table-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .table-meta .name { font-weight: 600; font-size: 14px; }
+  .table-meta .chip { font-size: 12px; color: var(--fg-soft); background: var(--muted-bg); padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+  .topbar .spacer { flex: 1; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 34px; padding: 0 13px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg);
+    font-weight: 500; font-size: 13px;
+    transition: background .15s, border-color .15s, transform .08s, box-shadow .15s; white-space: nowrap;
+  }
+  .btn svg { width: 16px; height: 16px; }
+  .btn:hover { background: var(--muted-bg); border-color: var(--muted); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .btn.ghost { border-color: transparent; background: transparent; }
+  .btn.ghost:hover { background: var(--muted-bg); }
+  .btn.icon { padding: 0; width: 34px; justify-content: center; }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.primary:hover { background: var(--primary-600); border-color: var(--primary-600); }
+  .btn.source { background: var(--source); color: #fff; border-color: var(--source); box-shadow: var(--shadow-sm); }
+  .btn.source:hover { background: var(--source-600); border-color: var(--source-600); }
+  .btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: var(--shadow-sm); }
+  .btn.accent:hover { background: var(--accent-600); border-color: var(--accent-600); }
+  .btn.sm { height: 30px; font-size: 12.5px; padding: 0 11px; }
+  .btn[disabled] { opacity: .5; pointer-events: none; }
+
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff; font-weight: 600; font-size: 13px; display: grid; place-items: center; }
+
+  /* ---- sub toolbar ---- */
+  .subbar {
+    display: flex; align-items: center; gap: 8px;
+    height: 46px; padding: 0 16px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    flex-shrink: 0; z-index: 20;
+  }
+  .subbar .tab { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--fg-soft); border: 1px solid transparent; }
+  .subbar .tab svg { width: 15px; height: 15px; }
+  .subbar .tab.active { background: var(--muted-bg); color: var(--fg); }
+  .subbar .tab:hover:not(.active) { background: var(--muted-bg); }
+  .subbar .spacer { flex: 1; }
+  .vsep { width: 1px; height: 22px; background: var(--border); }
+  .search { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px; border-radius: 7px; background: var(--muted-bg); border: 1px solid transparent; width: 200px; }
+  .search:focus-within { background: var(--surface); border-color: var(--primary); }
+  .search svg { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+  .search input { border: 0; background: transparent; outline: none; color: var(--fg); font-size: 13px; width: 100%; }
+  .count-pill { font-size: 12px; color: var(--fg-soft); display: flex; align-items: center; gap: 5px; }
+  .count-pill b { color: var(--fg); font-weight: 600; }
+  .legend { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+
+  /* ---- workspace = sidebar + grid ---- */
+  .workspace { flex: 1; display: flex; min-height: 0; position: relative; }
+
+  /* ============================================================ DISCOVERY SIDEBAR */
+  .finder {
+    width: 348px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    overflow: hidden; transition: width .26s cubic-bezier(.4,0,.2,1), opacity .2s;
+  }
+  .finder.collapsed { width: 0; opacity: 0; border-right: 0; }
+  .finder .fh { display: flex; align-items: center; gap: 9px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .finder .fh .ic { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg,var(--source),var(--source-600)); color:#fff; display: grid; place-items: center; }
+  .finder .fh .ic svg { width: 16px; height: 16px; }
+  .finder .fh .t { font-weight: 600; font-size: 14px; }
+  .finder .fh .s { font-size: 11.5px; color: var(--muted); }
+  .finder .fh .x { margin-left: auto; width: 28px; height: 28px; border-radius: 7px; border: 0; background: var(--muted-bg); color: var(--fg-soft); display: grid; place-items: center; }
+  .finder .fh .x:hover { background: var(--border); }
+  .finder .fh .x svg { width: 15px; height: 15px; }
+
+  /* method segmented control */
+  .methods { display: flex; gap: 4px; padding: 12px 16px 0; flex-shrink: 0; }
+  .methods button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 9px 4px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2);
+    font-size: 11px; font-weight: 500; color: var(--fg-soft); transition: all .15s;
+  }
+  .methods button svg { width: 17px; height: 17px; }
+  .methods button:hover { border-color: var(--border-strong); }
+  .methods button.active { border-color: var(--source); color: var(--source); background: var(--source-bg); box-shadow: 0 0 0 1px var(--source); }
+
+  .fbody { flex: 1; overflow-y: auto; padding: 14px 16px 16px; }
+  .fform { display: none; flex-direction: column; gap: 13px; }
+  .fform.active { display: flex; }
+  .fld label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+  .fld .sub { color: var(--muted); font-weight: 400; }
+  .fld input[type=text], .fld input[type=number], .fld input[type=date], .fld textarea, .fld select {
+    width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px;
+    font-size: 13px; font-family: inherit; color: var(--fg); background: var(--surface); outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .fld input:focus, .fld textarea:focus, .fld select:focus { border-color: var(--source); box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+  .fld textarea { resize: vertical; min-height: 96px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-soft); cursor: pointer; padding: 2px 0; }
+  .chk input { width: 16px; height: 16px; accent-color: var(--source); }
+  .rangelbl { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+  .rangelbl b { color: var(--source); }
+  input[type=range] { width: 100%; accent-color: var(--source); }
+  .hintbox { font-size: 11.5px; color: var(--muted); line-height: 1.5; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .inn-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .inn-metric { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; }
+  .inn-metric .k { font-size: 10.5px; color: var(--muted); }
+  .inn-metric .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .inn-metric .v.hl { color: var(--source); }
+
+  .ffoot { padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--surface-2); }
+  .ffoot .btn { width: 100%; justify-content: center; height: 38px; }
+  .ffoot .src-keys { font-size: 11px; color: var(--muted); margin-top: 8px; display: flex; align-items: center; gap: 6px; justify-content: center; }
+  .ffoot .src-keys b { color: var(--fg-soft); font-weight: 600; }
+
+  /* ============================================================ GRID */
+  .grid-wrap { flex: 1; overflow: auto; position: relative; background: var(--bg); }
+  .grid { display: grid; width: max-content; min-width: 100%; }
+
+  .cell { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface); min-height: var(--row-h); display: flex; align-items: center; position: relative; }
+
+  /* group band (row 1) */
+  .gband { position: sticky; top: 0; z-index: 13; min-height: 32px; height: 32px; background: var(--surface-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px; padding: 0 13px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .gband svg { width: 13px; height: 13px; }
+  .gband.src { color: var(--source); }
+  .gband.scout { color: var(--primary); }
+  .gband.corner { left: 0; z-index: 17; }
+  .gband.divL { border-left: 2px solid var(--border-strong); }
+
+  /* header (row 2) */
+  .hcell { position: sticky; top: 32px; z-index: 12; background: var(--surface-2); border-bottom: 1px solid var(--border-strong); min-height: 52px; padding: 0; }
+  .hcell.corner { z-index: 16; left: 0; }
+  .col-domain { position: sticky; left: 0; z-index: 8; background: var(--surface); box-shadow: 1px 0 0 var(--border); }
+  .hcell.col-domain { z-index: 14; }
+  .divL { border-left: 2px solid var(--border-strong); }
+
+  .domain-head { display: flex; align-items: center; gap: 9px; padding: 0 12px; width: 100%; }
+  .domain-head .ic { width: 16px; height: 16px; color: var(--muted); }
+  .domain-head .lbl { font-weight: 600; font-size: 12.5px; letter-spacing: .01em; text-transform: uppercase; color: var(--fg-soft); }
+  .domain-head .spacer { flex: 1; }
+
+  /* native (source) column header */
+  .src-head { display: flex; align-items: center; gap: 7px; padding: 0 11px; width: 100%; }
+  .src-head .lbl { font-weight: 600; font-size: 12px; color: var(--fg-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .src-head svg { width: 13px; height: 13px; color: var(--source); flex-shrink: 0; }
+
+  .domain-cell { display: flex; align-items: center; gap: 10px; padding: 0 12px; width: 100%; min-width: 0; cursor: pointer; }
+  .domain-cell:hover { background: var(--surface-2); }
+  .favicon { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+  .domain-cell .meta { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+  .domain-cell .d-name { font-weight: 550; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .domain-cell .d-url { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .domain-cell .d-status { margin-left: auto; flex-shrink: 0; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot.ok { background: var(--found); } .dot.idle { background: var(--muted); }
+  .dot.run { background: var(--running); animation: pulse 1.1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  /* native cell */
+  .src-cell { width: 100%; padding: 0 11px; min-width: 0; font-size: 13px; }
+  .src-cell .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .src-cell .v.mono { font-family: var(--mono); font-size: 12px; }
+  .src-cell .v.num { font-variant-numeric: tabular-nums; }
+  .src-cell .muted { color: var(--muted); }
+  .srcbadge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .srcbadge svg { width: 11px; height: 11px; }
+  .srcbadge.fns { color: var(--source); background: var(--source-bg); }
+  .srcbadge.hh  { color: #DB2777; background: rgba(219,39,119,.1); }
+  .srcbadge.inn { color: #0891B2; background: rgba(8,145,178,.1); }
+  .srcbadge.import { color: var(--fg-soft); background: var(--muted-bg); }
+
+  /* AI column header (scout) */
+  .data-head { width: 100%; padding: 8px 11px 7px; display: flex; flex-direction: column; gap: 5px; }
+  .data-head .top { display: flex; align-items: center; gap: 7px; }
+  .data-head .typeic { width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0; display: grid; place-items: center; color: #fff; }
+  .data-head .typeic svg { width: 12px; height: 12px; }
+  .data-head .cname { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .data-head .menu-btn { width: 22px; height: 22px; border-radius: 5px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; }
+  .data-head .menu-btn:hover { background: var(--muted-bg); color: var(--fg); }
+  .data-head .menu-btn svg { width: 15px; height: 15px; }
+  .prompt-line { font-size: 11.5px; color: var(--fg-soft); background: var(--muted-bg); border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; transition: border-color .15s, background .15s; display: flex; align-items: center; gap: 6px; }
+  .prompt-line:hover { border-color: var(--border-strong); background: var(--surface); }
+  .prompt-line .pic { width: 12px; height: 12px; color: var(--primary); flex-shrink: 0; }
+  .prompt-line .tmpl { color: var(--accent); font-weight: 500; }
+  .prompt-line.empty { color: var(--muted); font-style: italic; }
+  .data-head .foot { display: flex; align-items: center; gap: 6px; }
+  .modeltag { font-size: 10.5px; font-weight: 500; color: var(--fg-soft); background: var(--surface); border: 1px solid var(--border); padding: 1px 7px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; }
+  .modeltag .gd { width: 6px; height: 6px; border-radius: 50%; background: var(--secondary); }
+  .data-head .runcol { margin-left: auto; height: 24px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--primary); color: var(--primary); background: transparent; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+  .data-head .runcol:hover { background: var(--primary); color: #fff; }
+  .data-head .runcol svg { width: 12px; height: 12px; }
+  .data-head .progress { height: 3px; border-radius: 3px; background: var(--muted-bg); overflow: hidden; margin-top: 2px; }
+  .data-head .progress > i { display: block; height: 100%; width: 0; background: var(--primary); transition: width .3s; }
+
+  .data-cell { width: 100%; padding: 0 12px; cursor: pointer; min-width: 0; }
+  .data-cell:hover { background: var(--surface-2); }
+  .data-cell .inner { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 0; min-width: 0; }
+  .cell-val { font-size: 13px; min-width: 0; overflow: hidden; }
+  .cell-val .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell-val .src { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell-val .src svg { width: 11px; height: 11px; flex-shrink: 0; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+  .badge svg { width: 12px; height: 12px; }
+  .badge.found { color: var(--found); background: var(--found-bg); }
+  .badge.notfound { color: var(--notfound); background: var(--notfound-bg); }
+  .badge.running { color: var(--running); background: var(--running-bg); }
+  .badge.queued { color: var(--muted); background: var(--muted-bg); }
+  .cell-empty { color: var(--muted); font-size: 12px; }
+  .spinner { width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .addcol-head { position: sticky; top: 32px; z-index: 11; background: var(--surface-2); border-bottom: 1px solid var(--border-strong); border-right: 1px solid var(--border); min-width: 150px; width: 150px; display: flex; align-items: center; justify-content: center; }
+  .addcol-head button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 7px; border: 1px dashed var(--border-strong); background: transparent; color: var(--fg-soft); font-size: 12.5px; font-weight: 500; }
+  .addcol-head button:hover { border-color: var(--primary); color: var(--primary); background: var(--found-bg); }
+  .addcol-head button svg { width: 15px; height: 15px; }
+  .addcol-gband { position: sticky; top: 0; z-index: 11; background: var(--surface-2); border-bottom: 1px solid var(--border); min-width: 150px; width: 150px; }
+  .addcol-body { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface); }
+
+  .addrow { grid-column: 1 / -1; position: sticky; left: 0; display: flex; align-items: center; gap: 8px; padding: 9px 14px; color: var(--fg-soft); font-size: 13px; font-weight: 500; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .addrow:hover { color: var(--source); background: var(--surface-2); }
+  .addrow svg { width: 16px; height: 16px; }
+
+  /* empty state */
+  .empty-state { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; padding: 40px; }
+  .empty-state .inner { text-align: center; color: var(--muted); max-width: 360px; pointer-events: auto; }
+  .empty-state .big { width: 56px; height: 56px; border-radius: 14px; background: var(--source-bg); color: var(--source); display: grid; place-items: center; margin: 0 auto 14px; }
+  .empty-state .big svg { width: 28px; height: 28px; }
+  .empty-state h3 { color: var(--fg); font-size: 16px; margin: 0 0 6px; }
+  .empty-state p { margin: 0 0 16px; line-height: 1.5; font-size: 13px; }
+
+  /* ============================================================ RUN STATUS BAR */
+  .runbar { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 12px 16px; width: 460px; max-width: calc(100vw - 40px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 40; }
+  .runbar.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .runbar .rb-top { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; }
+  .runbar .rb-top .t { font-weight: 600; font-size: 13px; }
+  .runbar .rb-top .sub { font-size: 12px; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .stages { display: flex; gap: 6px; }
+  .stage { flex: 1; }
+  .stage .bar { height: 4px; border-radius: 3px; background: var(--muted-bg); overflow: hidden; }
+  .stage .bar > i { display: block; height: 100%; width: 0; background: var(--primary); transition: width .4s; }
+  .stage.done .bar > i { width: 100% !important; background: var(--found); }
+  .stage .lbl { font-size: 10.5px; color: var(--muted); margin-top: 5px; display: flex; align-items: center; gap: 4px; }
+  .stage.active .lbl { color: var(--primary); font-weight: 600; }
+  .stage.done .lbl { color: var(--found); }
+  .keyword-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+  .keyword-chips .kw { font-size: 11px; font-family: var(--mono); color: var(--primary-700); background: var(--found-bg); border: 1px solid var(--primary); border-radius: 5px; padding: 1px 7px; }
+
+  /* ============================================================ DRAWER */
+  .scrim { position: fixed; inset: 0; background: rgba(15,23,42,.45); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 50; }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100vh; width: 460px; max-width: 92vw; background: var(--surface); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); z-index: 60; transform: translateX(100%); transition: transform .28s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; }
+  .drawer.show { transform: translateX(0); }
+  .drawer .dh { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .drawer .dh .favicon { width: 30px; height: 30px; border-radius: 8px; }
+  .drawer .dh .t { font-weight: 600; font-size: 14px; }
+  .drawer .dh .s { font-size: 12px; color: var(--muted); }
+  .drawer .dh .x { margin-left: auto; width: 30px; height: 30px; border-radius: 7px; border: 0; background: var(--muted-bg); color: var(--fg-soft); display: grid; place-items: center; }
+  .drawer .dh .x:hover { background: var(--border); }
+  .drawer .db { padding: 18px; overflow-y: auto; flex: 1; }
+  .dsection { margin-bottom: 20px; }
+  .dsection .lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 7px; }
+  .dvalue { font-size: 14px; line-height: 1.5; padding: 12px 14px; background: var(--muted-bg); border-radius: 9px; border: 1px solid var(--border); }
+  .dvalue.big { font-size: 16px; font-weight: 600; }
+  .src-link { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); font-size: 13px; text-decoration: none; font-weight: 500; word-break: break-all; }
+  .src-link svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .src-link:hover { text-decoration: underline; }
+  .prompt-box { font-size: 13px; line-height: 1.55; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; color: var(--fg-soft); }
+  .prompt-box .tmpl { color: var(--accent); font-weight: 600; background: rgba(234,88,12,.1); padding: 0 3px; border-radius: 3px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .meta-item { padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; }
+  .meta-item .k { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .meta-item .v { font-size: 13px; font-weight: 600; word-break: break-word; }
+  .crawl-list { display: flex; flex-direction: column; gap: 6px; }
+  .crawl-item { display: flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; }
+  .crawl-item .pg { color: var(--muted); font-family: var(--mono); font-size: 11px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crawl-item .tg { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 20px; flex-shrink: 0; }
+  .crawl-item .tg.hit { color: var(--found); background: var(--found-bg); }
+  .crawl-item .tg.skip { color: var(--muted); background: var(--muted-bg); }
+  .crawl-item > svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--muted); }
+
+  /* ============================================================ MODALS */
+  .modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.5); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .modal.show { opacity: 1; pointer-events: auto; }
+  .modal .panel { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg); width: 540px; max-width: 100%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; transform: scale(.96) translateY(8px); transition: transform .2s; border: 1px solid var(--border); }
+  .modal.show .panel { transform: scale(1) translateY(0); }
+  .modal .panel.wide { width: 760px; }
+  .modal .mh { display: flex; align-items: center; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+  .modal .mh .mic { width: 32px; height: 32px; border-radius: 8px; background: var(--found-bg); color: var(--primary); display: grid; place-items: center; }
+  .modal .mh .mic.srcic { background: var(--source-bg); color: var(--source); }
+  .modal .mh .mic svg { width: 18px; height: 18px; }
+  .modal .mh .t { font-weight: 600; font-size: 15px; }
+  .modal .mh .s { font-size: 12.5px; color: var(--muted); }
+  .modal .mh .x { margin-left: auto; width: 30px; height: 30px; border-radius: 7px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; }
+  .modal .mh .x:hover { background: var(--muted-bg); color: var(--fg); }
+  .modal .mb { padding: 18px 20px; overflow-y: auto; }
+  .modal .mf { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; align-items: center; background: var(--surface-2); }
+  .modal .mf .spacer { flex: 1; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
+  .field .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+  .field input[type=text], .field input[type=password], .field textarea, .field select { width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 11px; font-size: 13.5px; font-family: inherit; color: var(--fg); background: var(--surface); outline: none; transition: border-color .15s, box-shadow .15s; resize: vertical; }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,148,136,.15); }
+  .field textarea { min-height: 90px; line-height: 1.5; }
+  .field textarea.mono { font-family: var(--mono); font-size: 12.5px; }
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .type-opt { border: 1px solid var(--border-strong); border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+  .type-opt:hover { border-color: var(--muted); background: var(--surface-2); }
+  .type-opt.sel { border-color: var(--primary); background: var(--found-bg); box-shadow: 0 0 0 1px var(--primary); }
+  .type-opt .ti { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: #fff; margin-bottom: 8px; }
+  .type-opt .ti svg { width: 16px; height: 16px; }
+  .type-opt .tt { font-weight: 600; font-size: 13px; }
+  .type-opt .td { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .tmpl-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tmpl-chips button { font-size: 11.5px; font-family: var(--mono); color: var(--accent); background: rgba(234,88,12,.08); border: 1px solid rgba(234,88,12,.25); border-radius: 6px; padding: 3px 8px; }
+  .tmpl-chips button:hover { background: rgba(234,88,12,.16); }
+  .preset-list { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+  .preset { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; cursor: pointer; transition: border-color .15s, background .15s; }
+  .preset:hover { border-color: var(--primary); background: var(--found-bg); }
+  .preset .pi { width: 26px; height: 26px; border-radius: 6px; background: var(--muted-bg); color: var(--primary); display: grid; place-items: center; flex-shrink: 0; }
+  .preset .pi svg { width: 14px; height: 14px; }
+  .preset .pt { font-weight: 550; font-size: 13px; }
+  .preset .pd { font-size: 11.5px; color: var(--muted); }
+  .sett-group-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 4px 0 10px; display: flex; align-items: center; gap: 7px; }
+  .sett-group-lbl .sw { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* results preview table (finder modal) */
+  .res-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .res-metric { display: flex; align-items: baseline; gap: 6px; }
+  .res-metric b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .res-metric span { font-size: 12px; color: var(--muted); }
+  .res-table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; max-height: 46vh; overflow-y: auto; }
+  table.res { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.res th { position: sticky; top: 0; background: var(--surface-2); text-align: left; font-size: 11px; font-weight: 600; color: var(--fg-soft); padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; z-index: 2; }
+  table.res td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.res tr:last-child td { border-bottom: 0; }
+  table.res tr:hover td { background: var(--surface-2); }
+  table.res td.c { width: 34px; text-align: center; }
+  table.res input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--source); }
+  table.res .co { display: flex; align-items: center; gap: 8px; }
+  table.res .fav { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; display: grid; place-items: center; color: #fff; font-size: 9px; font-weight: 700; }
+  table.res .dom { color: var(--source); font-size: 11.5px; }
+  table.res .num { font-variant-numeric: tabular-nums; }
+  table.res .mono { font-family: var(--mono); font-size: 11.5px; }
+
+  /* toast */
+  .toast-wrap { position: fixed; bottom: 22px; left: 22px; z-index: 90; display: flex; flex-direction: column; gap: 8px; }
+  .toast { display: flex; align-items: center; gap: 9px; background: var(--fg); color: var(--surface); padding: 11px 15px; border-radius: 10px; box-shadow: var(--shadow-lg); font-size: 13px; font-weight: 500; transform: translateY(10px); opacity: 0; transition: transform .25s, opacity .25s; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast svg { width: 16px; height: 16px; color: var(--secondary); }
+
+  /* popover for prompt edit */
+  .popover { position: fixed; z-index: 80; width: 320px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 13px; opacity: 0; pointer-events: none; transform: translateY(-6px); transition: opacity .15s, transform .15s; }
+  .popover.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .popover .pl { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; letter-spacing: .03em; }
+  .popover textarea { width: 100%; min-height: 70px; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; resize: vertical; outline: none; color: var(--fg); background: var(--surface); }
+  .popover textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,148,136,.15); }
+  .popover .pf { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 860px) {
+    .table-meta .chip, .hide-sm { display: none; }
+    .finder { position: absolute; left: 0; top: 0; bottom: 0; z-index: 25; box-shadow: var(--shadow-lg); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </span>
+      Scout <span class="ver">unified · prototype</span>
+    </div>
+    <div class="divider"></div>
+    <div class="table-meta">
+      <span class="name">Лиды · 3D-туры</span>
+      <span class="chip">Поиск + Скаут</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn ghost icon hide-sm" id="themeBtn" title="Тема" aria-label="Переключить тему">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+    <button class="btn hide-sm" id="exportBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      Экспорт
+    </button>
+    <button class="btn hide-sm" id="settingsBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+      Настройки
+    </button>
+    <button class="btn accent" id="runAllBtn">
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+      Запустить скаут
+    </button>
+    <div class="avatar">S</div>
+  </header>
+
+  <!-- ===================== SUB TOOLBAR ===================== -->
+  <div class="subbar">
+    <button class="btn source sm" id="findBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      Найти компании
+    </button>
+    <button class="btn ghost sm" id="importBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
+      Импорт доменов
+    </button>
+    <div class="vsep"></div>
+    <span class="legend"><span class="sw" style="background:var(--source)"></span>Из поиска</span>
+    <span class="legend"><span class="sw" style="background:var(--primary)"></span>Скаут · AI</span>
+    <div class="spacer"></div>
+    <span class="count-pill"><b id="cntCompanies">0</b> компаний</span>
+    <span class="count-pill"><b id="cntCols">0</b> AI-столбцов</span>
+    <span class="count-pill"><span class="dot ok"></span><b id="cntFound">0</b> найдено</span>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchInput" placeholder="Найти компанию…" />
+    </div>
+  </div>
+
+  <!-- ===================== WORKSPACE ===================== -->
+  <div class="workspace">
+
+    <!-- ---- DISCOVERY SIDEBAR ---- -->
+    <aside class="finder" id="finder">
+      <div class="fh">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+        <div style="min-width:0">
+          <div class="t">Найти компании</div>
+          <div class="s">Источник строк для таблицы</div>
+        </div>
+        <button class="x" id="finderClose" aria-label="Свернуть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+      </div>
+
+      <div class="methods" id="methods">
+        <button data-method="fns" class="active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M7 12h10M10 18h4"/></svg>
+          Фильтры
+        </button>
+        <button data-method="hh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Вакансии
+        </button>
+        <button data-method="inn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+          Список ИНН
+        </button>
+      </div>
+
+      <div class="fbody">
+        <!-- METHOD: FNS FILTERS -->
+        <div class="fform active" data-form="fns">
+          <div class="fld">
+            <label>ОКВЭД <span class="sub">через |</span></label>
+            <input type="text" id="f_okved" placeholder="62 или 62.01|62.02" />
+          </div>
+          <div class="fld">
+            <label>Регион</label>
+            <select id="f_region"></select>
+          </div>
+          <div class="fld">
+            <label>Выручка, млн ₽</label>
+            <div class="two">
+              <input type="number" id="f_rev_min" placeholder="от" min="0" />
+              <input type="number" id="f_rev_max" placeholder="до" min="0" />
+            </div>
+          </div>
+          <div class="fld">
+            <label>Сотрудников, от</label>
+            <input type="number" id="f_staff" placeholder="напр. 10" min="0" />
+          </div>
+          <div class="fld">
+            <label class="chk"><input type="checkbox" id="f_phone" /> Только с телефоном</label>
+            <label class="chk"><input type="checkbox" id="f_email" /> Только с Email</label>
+            <label class="chk"><input type="checkbox" id="f_active" checked /> Только действующие</label>
+          </div>
+          <div class="hintbox">Реестр юрлиц (API ФНS). На вход — фильтры, на выходе компании с ИНН, адресом и контактами. Обогащение через OFDATA по ИНН.</div>
+        </div>
+
+        <!-- METHOD: HH VACANCIES -->
+        <div class="fform" data-form="hh">
+          <div class="fld">
+            <label>Ключевое слово вакансии</label>
+            <input type="text" id="h_kw" placeholder="менеджер по продажам" />
+          </div>
+          <div class="fld">
+            <label>Город (HH)</label>
+            <select id="h_area"></select>
+          </div>
+          <div class="fld">
+            <label class="chk"><input type="checkbox" id="h_title" checked /> Только в названии вакансии</label>
+          </div>
+          <div class="fld">
+            <label>Дата публикации</label>
+            <div class="two">
+              <input type="date" id="h_from" />
+              <input type="date" id="h_to" />
+            </div>
+          </div>
+          <div class="fld">
+            <div class="rangelbl"><span>Макс. страниц <span class="sub">(100 вак./стр.)</span></span><b id="h_pages_val">5</b></div>
+            <input type="range" id="h_pages" min="1" max="20" value="5" />
+          </div>
+          <div class="hintbox">Находит компании, которые публикуют вакансии по ключевому слову. Дедуп по работодателю, затем подтягиваются сайт, отрасли и описание.</div>
+        </div>
+
+        <!-- METHOD: INN LIST -->
+        <div class="fform" data-form="inn">
+          <div class="fld">
+            <label>Список ИНН <span class="sub">10/12 цифр</span></label>
+            <textarea id="i_text" placeholder="7707083893&#10;7810150531&#10;можно с текстом, пробелами и запятыми"></textarea>
+          </div>
+          <div class="fld">
+            <label class="chk"><input type="checkbox" id="i_checksum" /> Проверять контрольные суммы ИНН</label>
+          </div>
+          <div class="inn-metrics" id="i_metrics">
+            <div class="inn-metric"><div class="k">Числовых фрагментов</div><div class="v" id="im_seq">0</div></div>
+            <div class="inn-metric"><div class="k">Похоже на ИНН</div><div class="v" id="im_cand">0</div></div>
+            <div class="inn-metric"><div class="k">Уникальных к запуску</div><div class="v hl" id="im_uniq">0</div></div>
+            <div class="inn-metric"><div class="k">Дубликатов отброшено</div><div class="v" id="im_dup">0</div></div>
+          </div>
+          <div class="hintbox">Прямое обогащение по ИНН через OFDATA — фильтры слева игнорируются. Удобно, когда список компаний уже есть.</div>
+        </div>
+      </div>
+
+      <div class="ffoot">
+        <button class="btn source" id="finderRun">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <span id="finderRunLbl">Найти компании</span>
+        </button>
+        <div class="src-keys"><b id="srcKeyName">FNS · OFDATA</b> · ключи в Настройках</div>
+      </div>
+    </aside>
+
+    <!-- ---- GRID ---- -->
+    <div class="grid-wrap" id="gridWrap">
+      <div class="grid" id="grid"></div>
+      <div class="empty-state hidden" id="emptyState">
+        <div class="inner">
+          <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+          <h3>Таблица пустая</h3>
+          <p>Найдите компании через фильтры реестра, вакансии HH.ru или список ИНН — они станут строками. Затем добавьте AI-столбцы и запустите скаут.</p>
+          <button class="btn source" onclick="openFinder()">Найти компании</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- run status bar -->
+    <div class="runbar" id="runbar">
+      <div class="rb-top">
+        <span class="spinner" style="color:var(--primary)"></span>
+        <span class="t" id="rbTitle">Запуск пайплайна…</span>
+        <span class="sub" id="rbSub">0 / 0</span>
+      </div>
+      <div class="stages">
+        <div class="stage" id="stage1"><div class="bar"><i></i></div><div class="lbl">1 · Ключевые слова</div></div>
+        <div class="stage" id="stage2"><div class="bar"><i></i></div><div class="lbl">2 · Краулинг сайтов</div></div>
+        <div class="stage" id="stage3"><div class="bar"><i></i></div><div class="lbl">3 · LLM-извлечение</div></div>
+      </div>
+      <div class="keyword-chips" id="kwChips"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- DRAWER / SCRIM / MODAL / POPOVER / TOASTS -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer"></aside>
+<div class="modal" id="modalRoot"><div class="panel" id="modalPanel"></div></div>
+<div class="popover" id="popover">
+  <div class="pl">Промпт для всего столбца</div>
+  <textarea id="popText"></textarea>
+  <div class="tmpl-chips">
+    <button data-tmpl="{{Company Name}}">{{Company&nbsp;Name}}</button>
+    <button data-tmpl="{{Website}}">{{Website}}</button>
+  </div>
+  <div class="pf">
+    <button class="btn ghost sm" id="popCancel">Отмена</button>
+    <button class="btn primary sm" id="popSave">Сохранить</button>
+  </div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* ============================================================ ICONS */
+const I = {
+  sparkles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  bldg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>',
+  code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>',
+  text: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M9 5v14M7 19h4"/></svg>',
+  filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>',
+  briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  hash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>',
+  chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>',
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 5a3.5 3.5 0 0 1 0 7M21 20a6 6 0 0 0-4-5.6"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>',
+};
+
+/* ============================================================ REFERENCE DATA (from growthloop-app) */
+const REGIONS = {
+  "Все регионы":"", "77 — Москва":"77", "78 — Санкт-Петербург":"78", "50 — Московская обл.":"50",
+  "16 — Татарстан":"16", "23 — Краснодарский край":"23", "66 — Свердловская обл.":"66",
+  "54 — Новосибирская обл.":"54", "52 — Нижегородская обл.":"52", "63 — Самарская обл.":"63",
+  "02 — Башкортостан":"02", "74 — Челябинская обл.":"74", "61 — Ростовская обл.":"61",
+};
+const HH_AREAS = {
+  "Вся Россия":113, "Москва":1, "Санкт-Петербург":2, "Екатеринбург":3, "Новосибирск":4,
+  "Казань":88, "Нижний Новгород":66, "Краснодар":53, "Самара":78, "Уфа":99,
+};
+const MODELS = ['gpt-4o-mini', 'gpt-4o', 'claude-haiku-4.5', 'claude-sonnet-4.6'];
+
+/* native columns coming from the finder (preserved fields) */
+const SRC_COLS = [
+  { key:'source',  label:'Источник',    w:124, type:'source' },
+  { key:'region',  label:'Регион',      w:150 },
+  { key:'okved',   label:'Отрасль / ОКВЭД', w:210 },
+  { key:'revenue', label:'Выручка',     w:130, type:'revenue' },
+  { key:'staff',   label:'Сотр.',       w:88,  type:'num' },
+  { key:'phone',   label:'Телефон',     w:152, type:'mono' },
+  { key:'email',   label:'Email',       w:180 },
+  { key:'inn',     label:'ИНН',         w:128, type:'mono' },
+];
+const SOURCE_META = {
+  fns:    { label:'Реестр',  icon:I.filter,    cls:'fns' },
+  hh:     { label:'HH.ru',   icon:I.briefcase, cls:'hh' },
+  inn:    { label:'ИНН',     icon:I.hash,      cls:'inn' },
+  import: { label:'Импорт',  icon:I.globe,     cls:'import' },
+};
+
+/* AI / scout column types (preserved from scout-clay-ui) */
+const COL_TYPES = {
+  ai:      { label:'AI-промпт',         icon:I.sparkles, color:'linear-gradient(135deg,#0D9488,#14B8A6)', desc:'LLM извлекает данные со страниц по вашему промпту' },
+  scrape:  { label:'Скрейпинг',         icon:I.globe,    color:'linear-gradient(135deg,#6366F1,#8B5CF6)', desc:'Краулер ищет факт по ключевым словам без LLM' },
+  enrich:  { label:'Обогащение',        icon:I.bolt,     color:'linear-gradient(135deg,#EA580C,#F59E0B)', desc:'Контакты, соцсети, телефон из футера сайта' },
+  formula: { label:'Формула / условие', icon:I.code,     color:'linear-gradient(135deg,#475569,#64748B)', desc:'Вычисление на основе других столбцов' },
+};
+
+/* ============================================================ MOCK COMPANY POOL */
+const FAVI = ['#0D9488','#6366F1','#EA580C','#DB2777','#0891B2','#7C3AED','#059669','#D97706','#2563EB','#DC2626'];
+const OKVEDS = ['62.01 — Разработка ПО','71.11 — Архитектура и проектирование','68.31 — Агентства недвижимости','73.11 — Рекламные агентства','74.20 — Фотодеятельность','43.99 — Строительство','90.03 — Художественное творчество','82.99 — Прочие бизнес-услуги'];
+const FIRST = ['Алексей','Дмитрий','Ирина','Сергей','Анна','Павел','Мария','Олег','Екатерина','Игорь'];
+const LAST = ['Морозов','Соколова','Кузнецов','Волкова','Лебедев','Орлова','Зайцев','Никитина','Громов','Соловьёва'];
+
+function hash(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return h; }
+function pick(arr, seed){ return arr[Math.abs(hash(''+seed)) % arr.length]; }
+function prettyName(d){ const b=d.split('.')[0].replace(/[-_]/g,' '); return b.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); }
+function fmtRub(mln){ return '₽ ' + new Intl.NumberFormat('ru-RU').format(mln) + ' млн'; }
+
+const DOMAIN_POOL = [
+  'archviz-studio.ru','tour360.io','matterspace.ru','vrhomes.ru','panoramic.studio','realtour3d.ru',
+  'immersive-realty.ru','spaceview.ru','prostranstvo.tech','digitwin.ru','metravel-tours.ru','show-flat.ru',
+  'virtuestate.ru','3dvision-arch.ru','holohome.ru','planoteka.ru','renderlab.ru','vizmaster.ru',
+  'cubicspace.ru','depthmap.ru','stereo-tour.ru','arenda360.ru','flatshow.ru','novostroy-tour.ru',
+];
+let domainCursor = 0;
+
+function makeCompany(source, idxSeed, overrides={}){
+  const domain = overrides.domain || DOMAIN_POOL[domainCursor++ % DOMAIN_POOL.length];
+  const seed = domain + source + idxSeed;
+  const inn = '' + (Math.abs(hash(seed)) % 9000000000 + 1000000000);
+  const regKeys = Object.keys(REGIONS).filter(k=>REGIONS[k]);
+  return {
+    id: 'c_' + (++companyCounter),
+    domain,
+    name: overrides.name || ('ООО «' + prettyName(domain) + '»'),
+    color: FAVI[companyCounter % FAVI.length],
+    source,
+    region: overrides.region || pick(regKeys, seed+'r'),
+    okved: overrides.okved || pick(OKVEDS, seed+'o'),
+    revenue: overrides.revenue != null ? overrides.revenue : (Math.abs(hash(seed+'v')) % 480 + 12),
+    staff: overrides.staff != null ? overrides.staff : (Math.abs(hash(seed+'s')) % 220 + 4),
+    phone: overrides.phone || ('+7 ' + (Math.abs(hash(seed+'p'))%900+100) + ' ' + String(Math.abs(hash(seed+'p2'))%1000).padStart(3,'0') + '-' + String(Math.abs(hash(seed+'p3'))%100).padStart(2,'0') + '-' + String(Math.abs(hash(seed+'p4'))%100).padStart(2,'0')),
+    email: overrides.email || ('info@' + domain),
+    inn: overrides.inn || inn,
+    extra: overrides.extra || {},   // method-specific (вакансий, пример вакансии…)
+    scout: {},                      // AI cell results keyed by column id
+    status: 'idle',
+  };
+}
+
+/* ============================================================ STATE */
+let companyCounter = 0;
+let companies = [];
+let columns = [];   // AI / scout columns
+let colCounter = 0;
+let searchQuery = '';
+
+/* seed: a few companies already discovered + 3 AI columns with results, 1 empty to demo "run" */
+function seedDemo(){
+  const sources = ['fns','fns','fns','hh','hh','inn','fns','hh'];
+  sources.forEach((s,i)=> companies.push(makeCompany(s, i)));
+
+  columns = [
+    { id:'col1', name:'Есть ли 3D-тур',  type:'scrape', prompt:'Проверь, есть ли на сайте {{Website}} виртуальный 3D-тур (Matterport, Kuula, встроенный виджет)', model:'gpt-4o-mini', status:'done', progress:1 },
+    { id:'col2', name:'ЛПР / руководитель', type:'ai',  prompt:'Кто генеральный директор или основатель компании {{Company Name}}? Верни только имя.', model:'gpt-4o-mini', status:'done', progress:1 },
+    { id:'col3', name:'CMS / стек сайта', type:'ai',     prompt:'Определи CMS или конструктор, на котором сделан сайт {{Website}}', model:'gpt-4o-mini', status:'idle', progress:0 },
+  ];
+  colCounter = columns.length;
+  columns.forEach(c => c.kind = detectKind(c.name, c.prompt));
+  companies.forEach(co => columns.forEach(c => {
+    co.scout[c.id] = (c.id==='col3') ? { status:'empty' } : genCell(co, c);
+  }));
+}
+
+/* ============================================================ SCOUT CELL GENERATION */
+function detectKind(name, prompt){
+  const s = (name + ' ' + prompt).toLowerCase();
+  if(/email|почт|mail/.test(s)) return 'email';
+  if(/ceo|директор|founder|основат|руковод|лпр/.test(s)) return 'ceo';
+  if(/phone|телефон|звон/.test(s)) return 'phone';
+  if(/адрес|address|офис|город|location/.test(s)) return 'address';
+  if(/3d|тур|virtual|matterport/.test(s)) return 'tour';
+  if(/cms|стек|конструктор|tilda|wordpress|bitrix/.test(s)) return 'cms';
+  if(/instagram|соц|social|telegram|vk/.test(s)) return 'social';
+  return 'generic';
+}
+const DATA = {
+  email:   { found:.85, vals:['info@{d}','sales@{d}','hello@{d}','office@{d}'], page:['/contacts','/about','/'] },
+  ceo:     { found:.6,  vals:null, page:['/about','/team','/o-kompanii'] },
+  phone:   { found:.78, vals:['+7 495 120-44-19','+7 812 332-08-71','+7 800 555-35-35'], page:['/contacts','/'] },
+  address: { found:.7,  vals:['Москва, ул. Тверская, 18','СПб, Невский пр., 28','Казань, ул. Баумана, 44'], page:['/contacts','/about'] },
+  tour:    { found:.5,  vals:['Да — Matterport на главной','Да — встроенный 3D-виджет','Да — раздел «Виртуальный тур»','Kuula-тур в портфолио'], page:['/','/portfolio','/projects'] },
+  cms:     { found:.8,  vals:['Tilda','WordPress + Elementor','1C-Bitrix','Webflow','Next.js (кастом)','Readymag'], page:['/'] },
+  social:  { found:.72, vals:['t.me/{n} · 3.1k','vk.com/{n} · 8.9k'], page:['/','/contacts'] },
+  generic: { found:.65, vals:['Найдено совпадение по запросу','Релевантный фрагмент со страницы','Данные извлечены из контента'], page:['/','/about','/services'] },
+};
+function genCell(co, col){
+  const cfg = DATA[col.kind] || DATA.generic;
+  const r = (Math.abs(hash(co.domain + col.id)) % 100)/100;
+  if(r >= cfg.found) return { status:'notfound', value:null, sourceUrl:null };
+  const n = co.domain.split('.')[0];
+  let v;
+  if(col.kind==='ceo'){ v = pick(FIRST, co.domain+'f') + ' ' + pick(LAST, co.domain+'l'); }
+  else v = pick(cfg.vals, co.domain+col.id).replace('{d}', co.domain).replace(/{n}/g, n);
+  const page = pick(cfg.page, co.domain+col.id+'p');
+  return { status:'found', value:v, sourceUrl:'https://'+co.domain+page, page };
+}
+
+/* ============================================================ RENDER GRID */
+const grid = document.getElementById('grid');
+function visibleCompanies(){
+  if(!searchQuery) return companies;
+  const q = searchQuery.toLowerCase();
+  return companies.filter(c => (c.domain+c.name+c.inn+c.region).toLowerCase().includes(q));
+}
+function render(){
+  const vcs = visibleCompanies();
+  document.getElementById('emptyState').classList.toggle('hidden', companies.length>0);
+
+  grid.style.gridTemplateColumns =
+    `var(--domain-w) ${SRC_COLS.map(c=>c.w+'px').join(' ')} ${columns.map(()=>'260px').join(' ')} 150px`;
+
+  let html = '';
+
+  /* ---- ROW 1: group band ---- */
+  html += `<div class="gband corner col-domain"><span style="color:var(--fg-soft)">Компания</span></div>`;
+  html += `<div class="gband src" style="grid-column: span ${SRC_COLS.length}">${I.filter}Из поиска компаний</div>`;
+  if(columns.length)
+    html += `<div class="gband scout divL" style="grid-column: span ${columns.length}">${I.sparkles}Скаут · AI-обогащение</div>`;
+  html += `<div class="addcol-gband"></div>`;
+
+  /* ---- ROW 2: headers ---- */
+  html += `<div class="cell hcell col-domain corner">
+      <div class="domain-head">${I.globe? '<span class="ic">'+I.globe+'</span>':''}<span class="lbl">Домен / компания</span><span class="spacer"></span><span class="badge queued">${companies.length}</span></div>
+    </div>`;
+  SRC_COLS.forEach(c=>{
+    html += `<div class="cell hcell"><div class="src-head"><span class="lbl">${c.label}</span></div></div>`;
+  });
+  columns.forEach((col,ci)=>{
+    const t = COL_TYPES[col.type];
+    const promptHtml = col.prompt ? highlightTmpl(escapeHtml(col.prompt)) : '<span class="empty">Добавьте промпт…</span>';
+    const pct = Math.round((col.progress||0)*100);
+    html += `<div class="cell hcell ${ci===0?'divL':''}" data-col="${col.id}">
+      <div class="data-head">
+        <div class="top">
+          <span class="typeic" style="background:${t.color}">${t.icon}</span>
+          <span class="cname" title="${escapeHtml(col.name)}">${escapeHtml(col.name)}</span>
+          <button class="menu-btn" data-action="colmenu" data-col="${col.id}" aria-label="Меню столбца">${I.dots}</button>
+        </div>
+        <div class="prompt-line ${col.prompt?'':'empty'}" data-action="editprompt" data-col="${col.id}" title="Редактировать промпт">
+          ${col.prompt?'<span class="pic">'+I.sparkles+'</span>':''}${promptHtml}
+        </div>
+        <div class="foot">
+          <span class="modeltag"><span class="gd"></span>${col.model}</span>
+          <button class="runcol" data-action="runcol" data-col="${col.id}">${I.play}<span>${col.status==='done'?'Обновить':'Запустить'}</span></button>
+        </div>
+        <div class="progress" style="${col.status==='running'?'':'visibility:hidden'}"><i style="width:${pct}%"></i></div>
+      </div></div>`;
+  });
+  html += `<div class="cell addcol-head"><button data-action="addcol">${I.plus} AI-столбец</button></div>`;
+
+  /* ---- DATA ROWS ---- */
+  vcs.forEach(co=>{
+    const anyRun = columns.some(c => co.scout[c.id]?.status==='running');
+    const foundCount = columns.filter(c => co.scout[c.id]?.status==='found').length;
+    html += `<div class="cell col-domain" data-action="opencompany" data-co="${co.id}">
+        <div class="domain-cell">
+          <span class="favicon" style="background:${co.color}">${co.name.replace(/[«"]/g,'').replace(/^ООО\s*/,'').charAt(0)}</span>
+          <span class="meta"><span class="d-name">${escapeHtml(co.name)}</span><span class="d-url">${escapeHtml(co.domain)}</span></span>
+          <span class="d-status">${anyRun?'<span class="dot run"></span>':foundCount?'<span class="dot ok"></span>':'<span class="dot idle"></span>'}</span>
+        </div></div>`;
+    SRC_COLS.forEach(c=> html += `<div class="cell">${renderSrcCell(co, c)}</div>`);
+    columns.forEach((col,ci)=>{
+      const cell = co.scout[col.id] || { status:'empty' };
+      html += `<div class="cell data-cell ${ci===0?'divL':''}" data-action="opencell" data-col="${col.id}" data-co="${co.id}"><div class="inner">${renderCellInner(cell)}</div></div>`;
+    });
+    html += `<div class="cell addcol-body"></div>`;
+  });
+
+  html += `<div class="addrow" data-action="addrows">${I.plus} Найти ещё компании</div>`;
+
+  grid.innerHTML = html;
+  updateCounts();
+}
+
+function renderSrcCell(co, c){
+  if(c.type==='source'){
+    const m = SOURCE_META[co.source] || SOURCE_META.import;
+    return `<div class="src-cell"><span class="srcbadge ${m.cls}">${m.icon}${m.label}</span></div>`;
+  }
+  let v = co[c.key];
+  if(c.type==='revenue') v = fmtRub(v);
+  if(c.type==='num') v = new Intl.NumberFormat('ru-RU').format(v);
+  const cls = c.type==='mono' ? 'v mono' : (c.type==='num'||c.type==='revenue' ? 'v num' : 'v');
+  if(!v && v!==0) return `<div class="src-cell"><span class="v muted">—</span></div>`;
+  return `<div class="src-cell"><span class="${cls}" title="${escapeHtml(''+v)}">${escapeHtml(''+v)}</span></div>`;
+}
+function renderCellInner(cell){
+  switch(cell.status){
+    case 'found': return `<div class="cell-val"><div class="v">${escapeHtml(cell.value)}</div>${cell.sourceUrl?`<div class="src">${I.link}${escapeHtml(cell.sourceUrl.replace('https://',''))}</div>`:''}</div>`;
+    case 'notfound': return `<span class="badge notfound">${I.x} Не найдено</span>`;
+    case 'running': return `<span class="badge running"><span class="spinner"></span> Анализ…</span>`;
+    case 'queued': return `<span class="badge queued">В очереди</span>`;
+    default: return `<span class="cell-empty">—</span>`;
+  }
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function highlightTmpl(s){ return s.replace(/\{\{[^}]+\}\}/g, m=>`<span class="tmpl">${m}</span>`); }
+function updateCounts(){
+  document.getElementById('cntCompanies').textContent = companies.length;
+  document.getElementById('cntCols').textContent = columns.length;
+  let found=0; columns.forEach(c=>companies.forEach(co=>{ if(co.scout[c.id]?.status==='found') found++; }));
+  document.getElementById('cntFound').textContent = found;
+}
+
+/* ============================================================ GRID EVENTS */
+grid.addEventListener('click', e=>{
+  const t = e.target.closest('[data-action]'); if(!t) return;
+  const a=t.dataset.action, colId=t.dataset.col, coId=t.dataset.co;
+  if(a==='addcol') openAddColumn();
+  else if(a==='runcol') runColumn(colId);
+  else if(a==='editprompt'){ e.stopPropagation(); openPromptPopover(colId, t); }
+  else if(a==='colmenu'){ e.stopPropagation(); openColMenu(t); }
+  else if(a==='opencell') openCellDrawer(colId, coId);
+  else if(a==='opencompany') openCompanyDrawer(coId);
+  else if(a==='addrows') openFinder();
+});
+
+/* ============================================================ DISCOVERY SIDEBAR LOGIC */
+const finder = document.getElementById('finder');
+let activeMethod = 'fns';
+const METHOD_KEYS = { fns:'FNS · OFDATA', hh:'HH.ru', inn:'OFDATA' };
+const METHOD_RUNLBL = { fns:'Найти компании', hh:'Найти по вакансиям', inn:'Обогатить и добавить' };
+
+function openFinder(){ finder.classList.remove('collapsed'); }
+function toggleFinder(){ finder.classList.toggle('collapsed'); }
+
+document.getElementById('findBtn').onclick = openFinder;
+document.getElementById('finderClose').onclick = ()=> finder.classList.add('collapsed');
+
+document.getElementById('methods').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-method]'); if(!b) return;
+  activeMethod = b.dataset.method;
+  document.querySelectorAll('#methods button').forEach(x=>x.classList.toggle('active', x===b));
+  document.querySelectorAll('.fform').forEach(f=>f.classList.toggle('active', f.dataset.form===activeMethod));
+  document.getElementById('finderRunLbl').textContent = METHOD_RUNLBL[activeMethod];
+  document.getElementById('srcKeyName').textContent = METHOD_KEYS[activeMethod];
+});
+
+/* populate selects */
+(function fillSelects(){
+  const r = document.getElementById('f_region');
+  r.innerHTML = Object.keys(REGIONS).map(k=>`<option value="${REGIONS[k]}">${k}</option>`).join('');
+  const a = document.getElementById('h_area');
+  a.innerHTML = Object.keys(HH_AREAS).map(k=>`<option value="${HH_AREAS[k]}">${k}</option>`).join('');
+})();
+document.getElementById('h_pages').addEventListener('input', e=>{ document.getElementById('h_pages_val').textContent = e.target.value; });
+
+/* INN live metrics (mirrors parse_inns) */
+function parseInns(text, validate){
+  const seqs = (text.match(/\d+/g) || []);
+  const cand = seqs.filter(s=>s.length===10||s.length===12);
+  const seen=new Set(), uniq=[];
+  cand.forEach(s=>{ if(!seen.has(s)){ seen.add(s); uniq.push(s); } });
+  const dup = cand.length - uniq.length;
+  return { seq:seqs.length, cand:cand.length, uniq:uniq.length, dup, list:uniq };
+}
+document.getElementById('i_text').addEventListener('input', updateInnMetrics);
+document.getElementById('i_checksum').addEventListener('change', updateInnMetrics);
+function updateInnMetrics(){
+  const p = parseInns(document.getElementById('i_text').value, document.getElementById('i_checksum').checked);
+  document.getElementById('im_seq').textContent = p.seq;
+  document.getElementById('im_cand').textContent = p.cand;
+  document.getElementById('im_uniq').textContent = p.uniq;
+  document.getElementById('im_dup').textContent = p.dup;
+}
+
+/* RUN finder -> results preview modal */
+document.getElementById('finderRun').onclick = ()=>{
+  if(activeMethod==='fns')      runFnsSearch();
+  else if(activeMethod==='hh')  runHhSearch();
+  else                          runInnSearch();
+};
+
+function previewRows(method, n){
+  domainCursor = (Math.abs(hash(method+Date.now())) % DOMAIN_POOL.length);
+  const rows = [];
+  for(let i=0;i<n;i++){
+    const co = makeCompany(method, 'prev'+i+Date.now());
+    if(method==='hh'){ co.extra.vacancies = Math.abs(hash(co.domain+'vac'))%40+1; co.extra.sample = pick(['Менеджер по продажам','3D-визуализатор','Архитектор','Маркетолог','Руководитель проектов'], co.domain+'smp'); }
+    rows.push({ co, sel:true });
+  }
+  return rows;
+}
+
+function runFnsSearch(){
+  const okved = document.getElementById('f_okved').value.trim();
+  const regName = document.getElementById('f_region').selectedOptions[0].text;
+  const revMin = +document.getElementById('f_rev_min').value||0;
+  const revMax = +document.getElementById('f_rev_max').value||0;
+  const staff = +document.getElementById('f_staff').value||0;
+  const n = 14;
+  const rows = previewRows('fns', n).map(r=>{
+    if(REGIONS[regName]) r.co.region = regName;
+    if(revMin) r.co.revenue = Math.max(r.co.revenue, revMin + (Math.abs(hash(r.co.domain))%40));
+    if(revMax && r.co.revenue>revMax) r.co.revenue = Math.max(revMin||1, revMax - (Math.abs(hash(r.co.domain))%10));
+    if(staff) r.co.staff = Math.max(r.co.staff, staff + Math.abs(hash(r.co.domain+'s'))%30);
+    if(okved) r.co.okved = okved + ' — ' + r.co.okved.split('— ')[1];
+    return r;
+  });
+  const filters = [okved&&`ОКВЭД ${okved}`, REGIONS[regName]&&regName, (revMin||revMax)&&`выручка ${revMin||'0'}–${revMax||'∞'} млн`, staff&&`сотр. ≥ ${staff}`].filter(Boolean);
+  openResults({ method:'fns', title:'Поиск по фильтрам (реестр)', sub: filters.length?filters.join(' · '):'без фильтров', rows,
+    cols:[{k:'region',l:'Регион'},{k:'okved',l:'Отрасль'},{k:'revenue',l:'Выручка',t:'revenue'},{k:'inn',l:'ИНН',t:'mono'}] });
+}
+function runHhSearch(){
+  const kw = document.getElementById('h_kw').value.trim() || 'менеджер по продажам';
+  const areaName = document.getElementById('h_area').selectedOptions[0].text;
+  const pages = +document.getElementById('h_pages').value;
+  const rows = previewRows('hh', Math.min(16, pages*3+4)).map(r=>{ r.co.region = areaName==='Вся Россия'?r.co.region:areaName; return r; });
+  openResults({ method:'hh', title:'Поиск по вакансиям HH.ru', sub:`«${kw}» · ${areaName} · до ${pages} стр.`, rows,
+    cols:[{k:'region',l:'Город'},{k:'extra.vacancies',l:'Вакансий',t:'num'},{k:'extra.sample',l:'Пример вакансии'}] });
+}
+function runInnSearch(){
+  const p = parseInns(document.getElementById('i_text').value, document.getElementById('i_checksum').checked);
+  let list = p.list;
+  if(!list.length){ list = Array.from({length:8}, (_,i)=>''+(7700000000+i*137)); }
+  domainCursor = Math.abs(hash('inn'+Date.now())) % DOMAIN_POOL.length;
+  const rows = list.slice(0,40).map((inn,i)=>({ co: makeCompany('inn','inn'+i+inn, {inn}), sel:true }));
+  openResults({ method:'inn', title:'Обогащение по списку ИНН (OFDATA)', sub:`${rows.length} ИНН к обогащению`, rows,
+    cols:[{k:'region',l:'Регион'},{k:'okved',l:'Отрасль'},{k:'inn',l:'ИНН',t:'mono'},{k:'revenue',l:'Выручка',t:'revenue'}] });
+}
+
+function getPath(o,p){ return p.split('.').reduce((a,k)=>a&&a[k], o); }
+
+/* results preview modal */
+let resState = null;
+function openResults(cfg){
+  resState = cfg;
+  const m = SOURCE_META[cfg.method];
+  const head = `
+    <div class="mh">
+      <span class="mic srcic">${m.icon}</span>
+      <div style="min-width:0"><div class="t">${cfg.title}</div><div class="s">${escapeHtml(cfg.sub)}</div></div>
+      <button class="x" data-close>${I.x}</button>
+    </div>`;
+  openModal(head + `
+    <div class="mb">
+      <div class="res-top">
+        <div class="res-metric"><b id="resCount">${cfg.rows.length}</b><span>компаний найдено</span></div>
+        <div class="spacer" style="flex:1"></div>
+        <label class="chk" style="font-size:12.5px"><input type="checkbox" id="resAll" checked> Выбрать все</label>
+      </div>
+      <div class="res-table-wrap">
+        <table class="res"><thead><tr>
+          <th class="c"></th><th>Компания</th>
+          ${cfg.cols.map(c=>`<th>${c.l}</th>`).join('')}
+        </tr></thead><tbody id="resBody"></tbody></table>
+      </div>
+    </div>
+    <div class="mf">
+      <span class="s" style="font-size:12px;color:var(--muted)" id="resSelLbl"></span>
+      <div class="spacer"></div>
+      <button class="btn ghost" data-close>Отмена</button>
+      <button class="btn source" id="resAdd">${I.plus} <span id="resAddLbl"></span></button>
+    </div>`, true);
+
+  renderResBody();
+  document.getElementById('resAll').onchange = e=>{ resState.rows.forEach(r=>r.sel=e.target.checked); renderResBody(); };
+  document.getElementById('resAdd').onclick = commitResults;
+  modalPanel.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeModal);
+}
+function renderResBody(){
+  const body = document.getElementById('resBody');
+  body.innerHTML = resState.rows.map((r,idx)=>{
+    const co=r.co;
+    return `<tr>
+      <td class="c"><input type="checkbox" data-i="${idx}" ${r.sel?'checked':''}></td>
+      <td><div class="co"><span class="fav" style="background:${co.color}">${co.name.replace(/[«"]/g,'').replace(/^ООО\s*/,'').charAt(0)}</span>
+        <div style="min-width:0"><div style="font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">${escapeHtml(co.name)}</div><div class="dom">${escapeHtml(co.domain)}</div></div></div></td>
+      ${resState.cols.map(c=>{ let v=getPath(co,c.k); if(c.t==='revenue')v=fmtRub(v); if(c.t==='num')v=new Intl.NumberFormat('ru-RU').format(v); return `<td class="${c.t==='mono'?'mono':(c.t==='num'?'num':'')}">${escapeHtml(''+(v??'—'))}</td>`; }).join('')}
+    </tr>`;
+  }).join('');
+  body.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.onchange = ()=>{ resState.rows[+cb.dataset.i].sel = cb.checked; updateResSel(); });
+  updateResSel();
+}
+function updateResSel(){
+  const n = resState.rows.filter(r=>r.sel).length;
+  document.getElementById('resSelLbl').textContent = `Выбрано ${n} из ${resState.rows.length}`;
+  document.getElementById('resAddLbl').textContent = `Добавить в таблицу (${n})`;
+}
+function commitResults(){
+  const chosen = resState.rows.filter(r=>r.sel).map(r=>r.co);
+  let added=0;
+  chosen.forEach(co=>{
+    if(companies.some(x=>x.domain===co.domain)) return;
+    columns.forEach(c=> co.scout[c.id]={status:'empty'});
+    companies.push(co); added++;
+  });
+  closeModal(); render();
+  toast(added?`Добавлено компаний: ${added} → запустите скаут`:'Эти компании уже в таблице');
+}
+
+/* ============================================================ RUN PIPELINE (scout) */
+let running = false;
+function runColumn(colId){ const col=columns.find(c=>c.id===colId); if(!col) return; if(running){ toast('Дождитесь завершения текущего запуска'); return; } runPipeline([col]); }
+function runAll(){ if(running){ toast('Пайплайн уже выполняется'); return; } if(!columns.length){ toast('Нет AI-столбцов'); return; } if(!companies.length){ toast('Сначала найдите компании'); return; } runPipeline(columns.slice()); }
+
+async function runPipeline(cols){
+  running=true;
+  const vcs=companies; const total=vcs.length*cols.length; let done=0;
+  cols.forEach(col=>{ col.status='running'; col.progress=0; vcs.forEach(co=> co.scout[col.id]={status:'queued'}); });
+  render();
+  const runbar=document.getElementById('runbar');
+  const s1=stage('stage1'),s2=stage('stage2'),s3=stage('stage3');
+  [s1,s2,s3].forEach(s=>{ s.classList.remove('active','done'); s.querySelector('i').style.width='0'; });
+  document.getElementById('kwChips').innerHTML='';
+  runbar.classList.add('show');
+  document.getElementById('rbSub').textContent=`0 / ${total}`;
+
+  s1.classList.add('active'); document.getElementById('rbTitle').textContent='Stage 1 · Генерация ключевых слов…';
+  await fillBar(s1.querySelector('i'),700);
+  document.getElementById('kwChips').innerHTML = keywordsFor(cols).map(k=>`<span class="kw">${k}</span>`).join('');
+  s1.classList.remove('active'); s1.classList.add('done');
+
+  s2.classList.add('active'); document.getElementById('rbTitle').textContent='Stage 2 · Роботы обходят сайты…';
+  await fillBar(s2.querySelector('i'),1100); s2.classList.remove('active'); s2.classList.add('done');
+
+  s3.classList.add('active'); document.getElementById('rbTitle').textContent='Stage 3 · ИИ извлекает данные…';
+  for(const co of vcs){
+    for(const col of cols) co.scout[col.id]={status:'running'};
+    render(); await sleep(120);
+    for(const col of cols){ co.scout[col.id]=genCell(co,col); done++; }
+    const pct=done/total; cols.forEach(col=>col.progress=pct);
+    s3.querySelector('i').style.width=(pct*100)+'%';
+    document.getElementById('rbSub').textContent=`${done} / ${total}`;
+    render(); await sleep(70);
+  }
+  s3.classList.remove('active'); s3.classList.add('done');
+  cols.forEach(col=>{ col.status='done'; col.progress=1; }); render();
+  document.getElementById('rbTitle').textContent='Готово · данные обновлены';
+  let f=0; cols.forEach(col=>vcs.forEach(co=>{ if(co.scout[col.id].status==='found') f++; }));
+  toast(`Готово: найдено ${f} из ${total} значений`);
+  await sleep(1300); runbar.classList.remove('show'); running=false;
+}
+function stage(id){ return document.getElementById(id); }
+function keywordsFor(cols){
+  const map={ email:['email','контакты','связь'], ceo:['команда','о компании','директор'], phone:['телефон','контакты'], address:['адрес','офис'], tour:['3d-тур','matterport','панорама'], cms:['cms','meta generator','футер'], social:['соцсети','telegram','vk'], generic:['контакты','о компании','услуги'] };
+  const set=new Set(); cols.forEach(c=>(map[c.kind]||map.generic).forEach(k=>set.add(k))); return [...set].slice(0,7);
+}
+function fillBar(el,ms){ return new Promise(res=>{ requestAnimationFrame(()=>{ el.style.transition=`width ${ms}ms ease`; el.style.width='100%'; }); setTimeout(res,ms+50); }); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ============================================================ PROMPT POPOVER */
+const popover=document.getElementById('popover'); let popCol=null;
+function openPromptPopover(colId,anchor){ const col=columns.find(c=>c.id===colId); if(!col) return; popCol=col;
+  document.getElementById('popText').value=col.prompt;
+  const r=anchor.getBoundingClientRect();
+  popover.style.left=Math.min(r.left,window.innerWidth-340)+'px'; popover.style.top=(r.bottom+6)+'px';
+  popover.classList.add('show'); setTimeout(()=>document.getElementById('popText').focus(),50);
+}
+document.getElementById('popCancel').onclick=()=>popover.classList.remove('show');
+document.getElementById('popSave').onclick=()=>{ if(popCol){ popCol.prompt=document.getElementById('popText').value; popCol.kind=detectKind(popCol.name,popCol.prompt); render(); toast('Промпт обновлён'); } popover.classList.remove('show'); };
+popover.querySelectorAll('.tmpl-chips button').forEach(b=> b.onclick=()=>{ const ta=document.getElementById('popText'); ta.value+=(ta.value&&!ta.value.endsWith(' ')?' ':'')+b.dataset.tmpl; ta.focus(); });
+document.addEventListener('click',e=>{ if(popover.classList.contains('show')&&!popover.contains(e.target)&&!e.target.closest('[data-action=editprompt]')) popover.classList.remove('show'); });
+
+/* ============================================================ COLUMN MENU */
+let openMenuEl=null;
+function openColMenu(anchor){
+  const colId=anchor.dataset.col;
+  closeMenu();
+  const items=[{k:'run',label:'Запустить столбец'},{k:'edit',label:'Редактировать промпт'},{k:'dup',label:'Дублировать'},{k:'del',label:'Удалить столбец',danger:true}];
+  const m=document.createElement('div');
+  m.style.cssText=`position:fixed;z-index:85;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;min-width:190px;`;
+  const r=anchor.getBoundingClientRect(); m.style.left=Math.min(r.left,window.innerWidth-210)+'px'; m.style.top=(r.bottom+5)+'px';
+  items.forEach(it=>{ const b=document.createElement('button'); b.textContent=it.label;
+    b.style.cssText=`display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:7px;font-size:13px;font-weight:500;color:${it.danger?'var(--notfound)':'var(--fg)'};`;
+    b.onmouseenter=()=>b.style.background=it.danger?'var(--notfound-bg)':'var(--muted-bg)'; b.onmouseleave=()=>b.style.background='transparent';
+    b.onclick=()=>{ handleColAction(colId,it.k); closeMenu(); }; m.appendChild(b); });
+  document.body.appendChild(m); openMenuEl=m; setTimeout(()=>document.addEventListener('click',closeMenuOnce),0);
+}
+function closeMenuOnce(e){ if(openMenuEl&&!openMenuEl.contains(e.target)) closeMenu(); }
+function closeMenu(){ if(openMenuEl){ openMenuEl.remove(); openMenuEl=null; document.removeEventListener('click',closeMenuOnce); } }
+function handleColAction(colId,k){
+  const idx=columns.findIndex(c=>c.id===colId); if(idx<0) return; const col=columns[idx];
+  if(k==='run') runColumn(colId);
+  else if(k==='edit'){ const a=document.querySelector(`[data-action=editprompt][data-col="${colId}"]`); if(a) openPromptPopover(colId,a); }
+  else if(k==='dup'){ colCounter++; const nc=JSON.parse(JSON.stringify(col)); nc.id='col'+colCounter+'_'+Date.now(); nc.name=col.name+' (копия)'; nc.status='idle'; nc.progress=0; companies.forEach(co=>co.scout[nc.id]={status:'empty'}); columns.splice(idx+1,0,nc); render(); toast('Столбец дублирован'); }
+  else if(k==='del'){ companies.forEach(co=>delete co.scout[colId]); columns.splice(idx,1); render(); toast('Столбец удалён'); }
+}
+
+/* ============================================================ DRAWERS */
+const drawer=document.getElementById('drawer'); const scrim=document.getElementById('scrim');
+function openCellDrawer(colId,coId){
+  const col=columns.find(c=>c.id===colId), co=companies.find(c=>c.id===coId); if(!col||!co) return;
+  const cell=co.scout[colId]||{status:'empty'}; const t=COL_TYPES[col.type];
+  let resultHtml;
+  if(cell.status==='found') resultHtml=`<div class="dvalue big">${escapeHtml(cell.value)}</div>`;
+  else if(cell.status==='notfound') resultHtml=`<div class="dvalue" style="color:var(--notfound);display:flex;align-items:center;gap:8px">${I.x} Данные не найдены на просмотренных страницах</div>`;
+  else resultHtml=`<div class="dvalue" style="color:var(--muted)">Столбец ещё не запущен для этой компании</div>`;
+  const pages = cell.status==='found' ? [{p:cell.page||'/',hit:true},{p:'/contacts',hit:false},{p:'/about',hit:false}] : [{p:'/',hit:false},{p:'/about',hit:false},{p:'/contacts',hit:false}];
+  drawer.innerHTML=`
+    <div class="dh"><span class="favicon" style="background:${co.color};width:30px;height:30px;border-radius:8px">${co.name.replace(/[«"]/g,'').replace(/^ООО\s*/,'').charAt(0)}</span>
+      <div><div class="t">${escapeHtml(co.name)}</div><div class="s">${escapeHtml(co.domain)}</div></div>
+      <button class="x" id="drawerClose">${I.x}</button></div>
+    <div class="db">
+      <div class="dsection"><div class="lbl">AI-столбец</div>
+        <div style="display:flex;align-items:center;gap:9px"><span class="typeic" style="background:${t.color};width:24px;height:24px;border-radius:6px">${t.icon}</span>
+          <div><div style="font-weight:600;font-size:14px">${escapeHtml(col.name)}</div><div style="font-size:12px;color:var(--muted)">${t.label} · ${col.model}</div></div></div></div>
+      <div class="dsection"><div class="lbl">Результат</div>${resultHtml}
+        ${cell.sourceUrl?`<div style="margin-top:9px"><a class="src-link" href="${cell.sourceUrl}" target="_blank" rel="noopener">${I.link}${escapeHtml(cell.sourceUrl)}</a></div>`:''}</div>
+      <div class="dsection"><div class="lbl">Промпт столбца</div><div class="prompt-box">${highlightTmpl(escapeHtml(col.prompt||'—'))}</div></div>
+      <div class="dsection"><div class="meta-grid">
+        <div class="meta-item"><div class="k">Статус</div><div class="v" style="color:${cell.status==='found'?'var(--found)':cell.status==='notfound'?'var(--notfound)':'var(--muted)'}">${cell.status==='found'?'Найдено':cell.status==='notfound'?'Не найдено':'Ожидает'}</div></div>
+        <div class="meta-item"><div class="k">Просмотрено страниц</div><div class="v">${pages.length}</div></div>
+        <div class="meta-item"><div class="k">Модель</div><div class="v" style="font-size:12px">${col.model}</div></div>
+        <div class="meta-item"><div class="k">Тип</div><div class="v" style="font-size:12px">${t.label}</div></div></div></div>
+      <div class="dsection"><div class="lbl">След краулинга (Stage 2)</div><div class="crawl-list">
+        ${pages.map(pg=>`<div class="crawl-item">${I.globe}<span class="pg">${escapeHtml(co.domain+pg.p)}</span><span class="tg ${pg.hit?'hit':'skip'}">${pg.hit?'совпадение':'просмотрено'}</span></div>`).join('')}</div></div>
+    </div>`;
+  showDrawer();
+}
+function openCompanyDrawer(coId){
+  const co=companies.find(c=>c.id===coId); if(!co) return;
+  const m=SOURCE_META[co.source]||SOURCE_META.import;
+  const fields=[['Регион',co.region],['Отрасль / ОКВЭД',co.okved],['Выручка',fmtRub(co.revenue)],['Сотрудников',new Intl.NumberFormat('ru-RU').format(co.staff)],['Телефон',co.phone],['Email',co.email],['ИНН',co.inn]];
+  if(co.extra.vacancies) fields.push(['Вакансий (HH)',co.extra.vacancies]);
+  if(co.extra.sample) fields.push(['Пример вакансии',co.extra.sample]);
+  const scoutHtml = columns.length ? columns.map(col=>{ const cell=co.scout[col.id]||{status:'empty'}; const t=COL_TYPES[col.type];
+    const val = cell.status==='found'?escapeHtml(cell.value):(cell.status==='notfound'?'<span style="color:var(--notfound)">Не найдено</span>':'<span style="color:var(--muted)">—</span>');
+    return `<div class="crawl-item"><span class="typeic" style="background:${t.color};width:20px;height:20px;border-radius:5px">${t.icon}</span><span class="pg" style="color:var(--fg-soft);font-family:inherit">${escapeHtml(col.name)}</span><span style="font-weight:550;font-size:12.5px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</span></div>`; }).join('') : '<div class="dvalue" style="color:var(--muted)">AI-столбцов пока нет</div>';
+  drawer.innerHTML=`
+    <div class="dh"><span class="favicon" style="background:${co.color};width:30px;height:30px;border-radius:8px">${co.name.replace(/[«"]/g,'').replace(/^ООО\s*/,'').charAt(0)}</span>
+      <div><div class="t">${escapeHtml(co.name)}</div><div class="s">${escapeHtml(co.domain)}</div></div>
+      <button class="x" id="drawerClose">${I.x}</button></div>
+    <div class="db">
+      <div class="dsection"><div class="lbl">Источник</div>
+        <div style="display:flex;align-items:center;gap:9px"><span class="srcbadge ${m.cls}">${m.icon}${m.label}</span>
+        <a class="src-link" href="https://${co.domain}" target="_blank" rel="noopener">${I.link}${escapeHtml(co.domain)}</a></div></div>
+      <div class="dsection"><div class="lbl">Данные из поиска компаний</div><div class="meta-grid">
+        ${fields.map(([k,v])=>`<div class="meta-item"><div class="k">${k}</div><div class="v">${escapeHtml(''+v)}</div></div>`).join('')}</div></div>
+      <div class="dsection"><div class="lbl">Скаут · AI-обогащение</div><div class="crawl-list">${scoutHtml}</div></div>
+      <button class="btn primary" style="width:100%;justify-content:center" id="coRun">${I.play} Запустить скаут по этой компании</button>
+    </div>`;
+  showDrawer();
+  const r=document.getElementById('coRun'); if(r) r.onclick=()=>{ closeDrawer(); if(!columns.length){ toast('Сначала добавьте AI-столбец'); return; } if(running){ toast('Дождитесь завершения'); return; } runOneCompany(co); };
+}
+async function runOneCompany(co){
+  running=true; const cols=columns.slice();
+  cols.forEach(col=> co.scout[col.id]={status:'running'}); render();
+  await sleep(600);
+  for(const col of cols) co.scout[col.id]=genCell(co,col);
+  render(); running=false; toast(`Скаут по «${co.name}» завершён`);
+}
+function showDrawer(){ drawer.classList.add('show'); scrim.classList.add('show'); const x=document.getElementById('drawerClose'); if(x) x.onclick=closeDrawer; }
+function closeDrawer(){ drawer.classList.remove('show'); scrim.classList.remove('show'); }
+scrim.onclick=closeDrawer;
+
+/* ============================================================ MODALS */
+const modalRoot=document.getElementById('modalRoot'); const modalPanel=document.getElementById('modalPanel');
+function openModal(html, wide){ modalPanel.className='panel'+(wide?' wide':''); modalPanel.innerHTML=html; modalRoot.classList.add('show'); }
+function closeModal(){ modalRoot.classList.remove('show'); }
+modalRoot.addEventListener('click',e=>{ if(e.target===modalRoot) closeModal(); });
+
+/* ---- Add AI column ---- */
+let newColType='ai';
+function openAddColumn(){
+  const presets=[
+    {kind:'tour',icon:I.bldg,t:'Наличие 3D-тура',p:'Есть ли на сайте {{Website}} виртуальный 3D-тур (Matterport, Kuula)?'},
+    {kind:'ceo',icon:I.user,t:'ЛПР / руководитель',p:'Кто директор или основатель компании {{Company Name}}? Только имя.'},
+    {kind:'cms',icon:I.code,t:'CMS / стек сайта',p:'Определи CMS или конструктор сайта {{Website}}'},
+    {kind:'email',icon:I.mail,t:'Email со страницы',p:'Найди контактный email на сайте {{Website}}'},
+    {kind:'social',icon:I.send,t:'Соцсети',p:'Найди ссылки на соцсети компании {{Company Name}}'},
+  ];
+  openModal(`
+    <div class="mh"><span class="mic">${I.sparkles}</span><div><div class="t">Новый AI-столбец</div><div class="s">Промпт применится ко всем компаниям таблицы</div></div><button class="x" data-close>${I.x}</button></div>
+    <div class="mb">
+      <div class="field"><label>Тип столбца</label><div class="type-grid" id="typeGrid">
+        ${Object.entries(COL_TYPES).map(([k,v])=>`<div class="type-opt ${k==='ai'?'sel':''}" data-type="${k}"><div class="ti" style="background:${v.color}">${v.icon}</div><div class="tt">${v.label}</div><div class="td">${v.desc}</div></div>`).join('')}</div></div>
+      <div class="field"><label for="ncName">Название столбца</label><input type="text" id="ncName" placeholder="Напр. Наличие 3D-тура" /></div>
+      <div class="field"><label for="ncPrompt">Промпт <span style="color:var(--muted);font-weight:400">— что искать на каждом сайте</span></label>
+        <textarea id="ncPrompt" class="mono" placeholder="Опишите, что извлечь. Доступны переменные."></textarea>
+        <div class="tmpl-chips"><button data-tmpl="{{Company Name}}">{{Company Name}}</button><button data-tmpl="{{Website}}">{{Website}}</button></div>
+        <div class="hint">Переменные подставляются для каждой компании из данных поиска (название, домен).</div></div>
+      <div class="field"><label for="ncModel">Модель</label><select id="ncModel">${MODELS.map(m=>`<option ${m==='gpt-4o-mini'?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="field" style="margin-bottom:4px"><label style="margin-bottom:8px">Или выберите готовый шаблон</label><div class="preset-list">
+        ${presets.map(p=>`<div class="preset" data-preset='${JSON.stringify(p).replace(/'/g,"&#39;")}'><span class="pi">${p.icon}</span><div><div class="pt">${p.t}</div><div class="pd">${escapeHtml(p.p)}</div></div></div>`).join('')}</div></div>
+    </div>
+    <div class="mf"><div class="spacer"></div><button class="btn ghost" data-close>Отмена</button><button class="btn primary" id="ncCreate">${I.plus} Создать и запустить</button></div>`);
+  newColType='ai';
+  modalPanel.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeModal);
+  modalPanel.querySelectorAll('#typeGrid .type-opt').forEach(o=> o.onclick=()=>{ modalPanel.querySelectorAll('.type-opt').forEach(x=>x.classList.remove('sel')); o.classList.add('sel'); newColType=o.dataset.type; });
+  modalPanel.querySelectorAll('.tmpl-chips button').forEach(b=> b.onclick=()=>{ const ta=modalPanel.querySelector('#ncPrompt'); ta.value+=(ta.value&&!ta.value.endsWith(' ')?' ':'')+b.dataset.tmpl; ta.focus(); });
+  modalPanel.querySelectorAll('.preset').forEach(p=> p.onclick=()=>{ const d=JSON.parse(p.dataset.preset); modalPanel.querySelector('#ncName').value=d.t; modalPanel.querySelector('#ncPrompt').value=d.p; });
+  modalPanel.querySelector('#ncCreate').onclick=()=>{
+    const name=modalPanel.querySelector('#ncName').value.trim()||'Новый столбец';
+    const prompt=modalPanel.querySelector('#ncPrompt').value.trim(); const model=modalPanel.querySelector('#ncModel').value;
+    colCounter++; const col={id:'col'+colCounter+'_'+Date.now(),name,type:newColType,prompt,model,status:'idle',progress:0}; col.kind=detectKind(name,prompt);
+    companies.forEach(co=>co.scout[col.id]={status:'empty'}); columns.push(col); closeModal(); render();
+    document.getElementById('gridWrap').scrollLeft=99999;
+    if(prompt && companies.length) runColumn(col.id); else toast('Столбец создан');
+  };
+}
+
+/* ---- Import domains (manual source) ---- */
+function openImport(){
+  openModal(`
+    <div class="mh"><span class="mic srcic">${I.globe}</span><div><div class="t">Импорт доменов</div><div class="s">Ручной источник — по одному домену на строку</div></div><button class="x" data-close>${I.x}</button></div>
+    <div class="mb"><div class="field"><label for="impText">Список доменов</label>
+      <textarea id="impText" class="mono" style="min-height:150px" placeholder="example.ru&#10;company.ru&#10;brand.io"></textarea>
+      <div class="hint">Дубликаты пропускаются. Компании добавятся с источником «Импорт» — поля реестра можно дозаполнить обогащением.</div></div></div>
+    <div class="mf"><div class="spacer"></div><button class="btn ghost" data-close>Отмена</button><button class="btn source" id="impAdd">Добавить</button></div>`);
+  modalPanel.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeModal);
+  modalPanel.querySelector('#impAdd').onclick=()=>{
+    const raw=modalPanel.querySelector('#impText').value.split(/[\n,]/).map(s=>s.trim().replace(/^https?:\/\//,'').replace(/\/$/,'')).filter(Boolean);
+    let added=0; raw.forEach(dn=>{ if(companies.some(c=>c.domain===dn)) return; const co=makeCompany('import','imp'+dn,{domain:dn}); columns.forEach(c=>co.scout[c.id]={status:'empty'}); companies.push(co); added++; });
+    closeModal(); render(); toast(added?`Добавлено доменов: ${added}`:'Новых доменов нет');
+  };
+}
+
+/* ---- Settings (both services' keys) ---- */
+function openSettings(){
+  openModal(`
+    <div class="mh"><span class="mic">${I.bolt}</span><div><div class="t">Настройки</div><div class="s">Ключи API поиска и скаута</div></div><button class="x" data-close>${I.x}</button></div>
+    <div class="mb">
+      <div class="sett-group-lbl"><span class="sw" style="background:var(--source)"></span>Поиск компаний</div>
+      <div class="field"><label>FNS_API_KEY <span style="color:var(--muted);font-weight:400">— реестр юрлиц (api-fns)</span></label><input type="password" value="••••••••••••••••" /></div>
+      <div class="field"><label>OFDATA_API_KEY <span style="color:var(--muted);font-weight:400">— обогащение по ИНН</span></label><input type="password" value="••••••••••••••••" /></div>
+      <div class="field"><label>HH_API_KEY <span style="color:var(--muted);font-weight:400">— вакансии (опц., иначе анонимно)</span></label><input type="password" placeholder="не задан — ~10 запросов/мин" /></div>
+      <div class="sett-group-lbl" style="margin-top:18px"><span class="sw" style="background:var(--primary)"></span>Скаут · AI</div>
+      <div class="field"><label>OpenAI API Key</label><input type="password" value="sk-••••••••••••••••" /><div class="hint">Генерация ключевых слов и извлечение данных со страниц.</div></div>
+      <div class="field"><label>Модель по умолчанию</label><select>${MODELS.map(m=>`<option ${m==='gpt-4o-mini'?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="type-grid">
+        <div class="field" style="margin:0"><label>Стр. на домен (краулинг)</label><input type="text" value="5" /></div>
+        <div class="field" style="margin:0"><label>Стр. на домен (LLM)</label><input type="text" value="2" /></div>
+        <div class="field" style="margin:0"><label>Параллельных воркеров</label><input type="text" value="4" /></div>
+        <div class="field" style="margin:0"><label>Размер чанка</label><input type="text" value="50" /></div>
+      </div>
+    </div>
+    <div class="mf"><div class="spacer"></div><button class="btn ghost" data-close>Отмена</button><button class="btn primary" data-close>Сохранить</button></div>`);
+  modalPanel.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeModal);
+}
+
+/* ---- Export ---- */
+function openExport(){
+  openModal(`
+    <div class="mh"><span class="mic">${I.bolt}</span><div><div class="t">Экспорт результатов</div><div class="s">${companies.length} компаний · ${SRC_COLS.length} полей поиска + ${columns.length} AI-столбцов</div></div><button class="x" data-close>${I.x}</button></div>
+    <div class="mb"><div class="preset-list">
+      <div class="preset" id="exCsv"><span class="pi">${I.text}</span><div><div class="pt">Скачать CSV</div><div class="pd">leads.csv — поля реестра + AI-столбцы + source_url</div></div></div>
+      <div class="preset" id="exSheets"><span class="pi"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg></span><div><div class="pt">Экспорт в Google Sheets</div><div class="pd">Выгрузка в таблицу «3D Tours Results»</div></div></div>
+    </div></div>
+    <div class="mf"><div class="spacer"></div><button class="btn ghost" data-close>Закрыть</button></div>`);
+  modalPanel.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeModal);
+  modalPanel.querySelector('#exCsv').onclick=downloadCsv;
+  modalPanel.querySelector('#exSheets').onclick=()=>toast('Демо: выгрузка в Google Sheets (макет)');
+}
+function downloadCsv(){
+  const srcHeaders=['domain','company',...SRC_COLS.filter(c=>c.key!=='source').map(c=>c.label),'source'];
+  const aiHeaders=[...columns.map(c=>c.name),...columns.map(c=>c.name+' — source_url')];
+  const headers=[...srcHeaders,...aiHeaders];
+  const rows=companies.map(co=>{
+    const base=[co.domain,co.name,co.region,co.okved,co.revenue,co.staff,co.phone,co.email,co.inn,(SOURCE_META[co.source]||SOURCE_META.import).label];
+    const vals=columns.map(c=>{ const cell=co.scout[c.id]; return cell?.status==='found'?cell.value:(cell?.status==='notfound'?'Не найдено':''); });
+    const srcs=columns.map(c=>{ const cell=co.scout[c.id]; return cell?.sourceUrl||''; });
+    return [...base,...vals,...srcs];
+  });
+  const csv=[headers,...rows].map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='leads.csv'; a.click();
+  closeModal(); toast('CSV скачан');
+}
+
+/* ============================================================ TOAST / THEME / WIRES */
+function toast(msg){ const wrap=document.getElementById('toastWrap'); const el=document.createElement('div'); el.className='toast'; el.innerHTML=I.check+'<span>'+escapeHtml(msg)+'</span>'; wrap.appendChild(el); requestAnimationFrame(()=>el.classList.add('show')); setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); },3200); }
+document.getElementById('themeBtn').onclick=()=>{ const h=document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme')==='dark'?'light':'dark'); };
+document.getElementById('runAllBtn').onclick=runAll;
+document.getElementById('importBtn').onclick=openImport;
+document.getElementById('settingsBtn').onclick=openSettings;
+document.getElementById('exportBtn').onclick=openExport;
+document.getElementById('searchInput').oninput=e=>{ searchQuery=e.target.value; render(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal(); closeDrawer(); popover.classList.remove('show'); closeMenu(); } });
+
+/* init */
+seedDemo();
+render();
+</script>
+</body>
+</html>
