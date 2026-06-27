@@ -2,15 +2,21 @@
 # В дашборде Render: New → Blueprint → подключить этот репозиторий.
 # Значения секретов (sync:false) вводятся в UI Render при первом деплое.
 #
-# Конфиг ниже = always-on + постоянная БД (НЕ засыпает, работа не теряется):
-#   plan: starter (~$7/мес) + постоянный диск на /data.
-# Чтобы просто протестировать бесплатно (НО: засыпает при простое и сбрасывает
-# scout.db при редеплое) — поставьте plan: free и удалите блок disk.
+# Сейчас: БЕСПЛАТНЫЙ план (для теста). Минусы free:
+#   - сервис ЗАСЫПАЕТ при простое (первый заход ~30 сек);
+#   - файловая система эфемерная → scout.db сбрасывается при редеплое.
+# Для боевого always-on + постоянной БД: смените plan на "starter" и добавьте:
+#   envVars: - key: SCOUT_DB
+#              value: /data/scout.db
+#   disk:
+#     name: scout-data
+#     mountPath: /data
+#     sizeGB: 1
 services:
   - type: web
     name: ai-web-scout
     runtime: docker
-    plan: starter
+    plan: free
     envVars:
       - key: OPENAI_API_KEY   # ключ OpenAI для движка
         sync: false
@@ -18,10 +24,3 @@ services:
         sync: false
       - key: SCOUT_USER       # логин (по умолчанию scout)
         value: scout
-      - key: SCOUT_DB         # БД на постоянном диске
-        value: /data/scout.db
-    # Постоянное хранилище: scout.db переживает редеплои и перезапуски.
-    disk:
-      name: scout-data
-      mountPath: /data
-      sizeGB: 1
