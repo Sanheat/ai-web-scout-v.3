@@ -1,22 +1,27 @@
 # Render Blueprint — деплой AI Web Scout в один клик.
 # В дашборде Render: New → Blueprint → подключить этот репозиторий.
 # Значения секретов (sync:false) вводятся в UI Render при первом деплое.
+#
+# Конфиг ниже = always-on + постоянная БД (НЕ засыпает, работа не теряется):
+#   plan: starter (~$7/мес) + постоянный диск на /data.
+# Чтобы просто протестировать бесплатно (НО: засыпает при простое и сбрасывает
+# scout.db при редеплое) — поставьте plan: free и удалите блок disk.
 services:
   - type: web
     name: ai-web-scout
     runtime: docker
-    plan: free          # free: ФС эфемерная (БД сбрасывается при редеплое).
-                        # Для постоянной БД смените на starter и раскомментируйте disk ниже.
+    plan: starter
     envVars:
       - key: OPENAI_API_KEY   # ключ OpenAI для движка
         sync: false
       - key: SCOUT_PASSWORD   # пароль на вход (логин по умолчанию: scout)
         sync: false
-      - key: SCOUT_USER       # необязательно: логин (по умолчанию scout)
+      - key: SCOUT_USER       # логин (по умолчанию scout)
         value: scout
-    # --- Постоянное хранилище (нужен платный план) -------------------------
-    # disk:
-    #   name: scout-data
-    #   mountPath: /data
-    #   sizeGB: 1
-    # При включённом диске БД лежит в /data/scout.db (SCOUT_DB уже = /data/scout.db).
+      - key: SCOUT_DB         # БД на постоянном диске
+        value: /data/scout.db
+    # Постоянное хранилище: scout.db переживает редеплои и перезапуски.
+    disk:
+      name: scout-data
+      mountPath: /data
+      sizeGB: 1
