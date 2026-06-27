@@ -1,0 +1,16 @@
+.git
+__pycache__/
+*.py[cod]
+venv/
+.env
+scout.db
+scout.db-journal
+scout.db-wal
+scout.db-shm
+results.csv
+sites.csv
+google_creds.json
+prototype/
+Cashy
+.claude/
+*.md

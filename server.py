@@ -16,6 +16,7 @@ server.py — тонкий Flask-бэкенд для табличного (Clay-
 import os
 import io
 import csv
+import hmac
 import uuid
 import threading
 
@@ -34,7 +35,26 @@ FAVI_COLORS = ["#0D9488", "#6366F1", "#EA580C", "#DB2777", "#0891B2",
 RUNTIME = {"api_key": os.environ.get("OPENAI_API_KEY", "")}
 RUN_LOCK = threading.Lock()   # синхронные прогоны: один запуск за раз
 
+# Защита паролем (HTTP Basic). Если SCOUT_PASSWORD не задан — доступ открыт
+# (удобно локально). На публичном хостинге задайте SCOUT_PASSWORD обязательно.
+AUTH_USER = os.environ.get("SCOUT_USER", "scout")
+AUTH_PASS = os.environ.get("SCOUT_PASSWORD", "")
+
 store.init()
+store.reset_running_columns()   # восстановление после возможного падения/рестарта
+
+
+@app.before_request
+def _require_auth():
+    if not AUTH_PASS:
+        return None  # пароль не настроен — пускаем (локальная разработка)
+    a = request.authorization
+    if a and a.username == AUTH_USER and hmac.compare_digest(a.password or "", AUTH_PASS):
+        return None
+    return Response(
+        "Требуется авторизация", 401,
+        {"WWW-Authenticate": 'Basic realm="AI Web Scout", charset="UTF-8"'},
+    )
 
 
 def pretty_name(domain: str) -> str:
@@ -170,26 +190,33 @@ def _run_columns(columns):
 
     with RUN_LOCK:
         for col in columns:
-            store.update_column(col["id"], {"status": "running"})
-            try:
-                results = run_pipeline(domains, col["prompt"], api_key, model=col["model"])
-            except Exception as exc:  # noqa: BLE001
-                store.update_column(col["id"], {"status": "error"})
-                return {"error": "pipeline_failed", "detail": str(exc)}
+            col_id = col["id"]
 
-            for dom_name, res in results.items():
+            # Инкрементальное сохранение: пишем каждую ячейку, как только готова,
+            # чтобы падение/перезапуск посреди прогона не терял уже найденное.
+            def _save(dom_name, res, _cid=col_id):
                 dom_id = dom_by_name.get(dom_name)
                 if not dom_id:
-                    continue
+                    return
                 if res.get("result"):
-                    store.upsert_cell(col["id"], dom_id, {
+                    store.upsert_cell(_cid, dom_id, {
                         "status": "found",
                         "value": res["result"],
                         "sourceUrl": res.get("source_url"),
                     })
                 else:
-                    store.upsert_cell(col["id"], dom_id, {"status": "notfound"})
-            store.update_column(col["id"], {"status": "done"})
+                    store.upsert_cell(_cid, dom_id, {"status": "notfound"})
+
+            store.update_column(col_id, {"status": "running"})
+            try:
+                run_pipeline(domains, col["prompt"], api_key,
+                             model=col["model"], on_result=_save)
+            except Exception as exc:  # noqa: BLE001
+                # Уже сохранённые ячейки остаются; столбец помечаем idle для повторного запуска
+                store.update_column(col_id, {"status": "idle"})
+                return {"error": "pipeline_failed", "detail": str(exc)}
+
+            store.update_column(col_id, {"status": "done"})
     return None
 
 

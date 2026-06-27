@@ -40,6 +40,7 @@ def run_pipeline(
     api_key: str,
     model: str = "gpt-4o-mini",
     progress: Optional[Callable[[str, Optional[object]], None]] = None,
+    on_result: Optional[Callable[[str, Dict[str, Optional[str]]], None]] = None,
 ) -> Dict[str, Dict[str, Optional[str]]]:
     """
     Прогоняет список доменов через пайплайн под один запрос (один столбец Clay).
@@ -51,6 +52,10 @@ def run_pipeline(
       stage="keywords" payload=[ключевые слова]
       stage="crawl"    payload=None
       stage="llm"      payload=None
+
+    on_result(domain, {"result","source_url"}) — необязательный колбэк, вызывается
+    по мере готовности КАЖДОГО домена. Позволяет сохранять прогресс инкрементально,
+    чтобы падение/перезапуск посреди прогона не терял уже найденное.
     """
     domains = [d.strip() for d in domains if d and d.strip()]
     if not domains:
@@ -117,15 +122,24 @@ def run_pipeline(
                     r = fut.result()
                 except Exception:
                     r = {"site": site, "result": None, "source_url": None}
-                found[site] = {
-                    "result": r.get("result"),
-                    "source_url": r.get("source_url"),
-                }
+                cell = {"result": r.get("result"), "source_url": r.get("source_url")}
+                found[site] = cell
+                if on_result:
+                    try:
+                        on_result(site, cell)   # инкрементальное сохранение
+                    except Exception:
+                        pass
 
-        # Гарантируем наличие всех доменов в ответе (в т.ч. ненайденных)
-        return {
-            d: found.get(d, {"result": None, "source_url": None})
-            for d in domains
-        }
+        # Домены без кандидатов (краулер ничего не принёс) — тоже отдаём (как не найдено)
+        out: Dict[str, Dict[str, Optional[str]]] = {}
+        for d in domains:
+            cell = found.get(d, {"result": None, "source_url": None})
+            out[d] = cell
+            if d not in found and on_result:
+                try:
+                    on_result(d, cell)
+                except Exception:
+                    pass
+        return out
     finally:
         shutil.rmtree(workdir, ignore_errors=True)

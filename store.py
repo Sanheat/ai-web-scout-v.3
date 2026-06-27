@@ -184,6 +184,16 @@ def upsert_cell(column_id, domain_id, cell):
              cell.get("value"), cell.get("sourceUrl")))
 
 
+def reset_running_columns():
+    """При старте сервера сбрасываем 'зависшие' running-столбцы в idle.
+
+    Если процесс упал/перезапустился посреди прогона, статус running остался бы
+    навсегда. Уже сохранённые ячейки (found/notfound) при этом сохраняются.
+    """
+    with _lock, _conn() as c:
+        c.execute("UPDATE columns SET status='idle' WHERE status='running'")
+
+
 def get_setting(key, default=None):
     with _lock, _conn() as c:
         r = c.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
