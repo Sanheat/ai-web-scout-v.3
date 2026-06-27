@@ -30,6 +30,53 @@ SQLite на диске. Ниже — рабочие варианты.
 
 ---
 
+## 🇷🇺 Российский VPS (always-on, не засыпает, не теряет работу)
+
+Лучший вариант, если важно, чтобы сервис работал постоянно и переживал сбои.
+На VPS он крутится 24/7, а `systemd` с `Restart=always` сам поднимает его после
+любого падения — выполненная работа уже сохранена в `scout.db` (результат пишется
+по каждому домену сразу), поэтому **ничего не обнуляется**.
+
+**Провайдеры** (хватит тарифа ~1–2 vCPU / 2 ГБ RAM, примерно 200–500 ₽/мес):
+
+| Провайдер | Заметки |
+|---|---|
+| **Timeweb Cloud** (timeweb.cloud) | Просто, быстро, дёшево — хороший выбор по умолчанию |
+| **Beget** (beget.com) | Дешёвый VPS, простая панель |
+| **Selectel** (selectel.ru) | Надёжный, чуть дороже, больше возможностей |
+| **RuVDS / VDSina / Aéza** | Бюджетные VPS |
+| **Yandex Cloud / VK Cloud** | Enterprise, pay-as-you-go, сложнее в настройке |
+
+### Установка (Ubuntu 22.04/24.04)
+
+```bash
+# на сервере под root:
+apt-get update && apt-get install -y git
+git clone https://github.com/Sanheat/ai-web-scout-v.3.git /opt/ai-web-scout
+bash /opt/ai-web-scout/deploy/setup-vps.sh
+
+# затем вписать секреты и перезапустить:
+nano /opt/ai-web-scout/scout.env     # OPENAI_API_KEY, SCOUT_PASSWORD
+systemctl restart scout
+journalctl -u scout -f               # смотреть лог
+```
+
+Скрипт ставит зависимости, создаёт venv, заводит `systemd`-сервис (gunicorn,
+1 воркер, авто-рестарт) и nginx-прокси. Готовые конфиги — в папке `deploy/`
+(`scout.service`, `scout.env.example`, `nginx.conf.example`).
+
+Открой `http://IP_СЕРВЕРА` (логин `scout` / твой пароль). Для домена и HTTPS:
+впиши домен в `/etc/nginx/sites-available/scout` и выполни
+`certbot --nginx -d твой-домен.ru`.
+
+> **⚠️ OpenAI из России.** OpenAI блокирует запросы с российских IP — движок
+> (он ходит в `api.openai.com`) может получать ошибку региона. Варианты:
+> прокси для исходящих запросов к OpenAI, либо перевод движка на доступную в РФ
+> модель (YandexGPT, GigaChat, или OpenAI-совместимый шлюз через `base_url`).
+> Это отдельная небольшая доработка — скажи, если нужно.
+
+---
+
 ## Альтернатива: Railway / Fly.io
 
 Оба видят `Dockerfile` автоматически.

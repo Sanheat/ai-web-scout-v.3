@@ -1,0 +1,23 @@
+# Реверс-прокси nginx для AI Web Scout.
+#   sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/scout
+#   sudo ln -s /etc/nginx/sites-available/scout /etc/nginx/sites-enabled/scout
+#   sudo nginx -t && sudo systemctl reload nginx
+# HTTPS: после запуска выполнить  sudo certbot --nginx -d ВАШ_ДОМЕН
+
+server {
+    listen 80;
+    server_name ВАШ_ДОМЕН.ru;   # или IP сервера
+
+    # Краулинг идёт долго — поднимаем таймауты, иначе nginx вернёт 504.
+    proxy_read_timeout 1800s;
+    proxy_send_timeout 1800s;
+    client_max_body_size 5m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

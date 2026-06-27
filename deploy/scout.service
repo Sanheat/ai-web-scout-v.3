@@ -1,0 +1,28 @@
+# systemd-юнит для AI Web Scout.
+# Установка:
+#   sudo cp deploy/scout.service /etc/systemd/system/scout.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now scout
+# Логи:        journalctl -u scout -f
+# Перезапуск:  sudo systemctl restart scout
+
+[Unit]
+Description=AI Web Scout
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scout
+WorkingDirectory=/opt/ai-web-scout
+EnvironmentFile=/opt/ai-web-scout/scout.env
+ExecStart=/opt/ai-web-scout/venv/bin/gunicorn server:app \
+    --workers 1 --threads 8 --timeout 1800 --bind 127.0.0.1:8000
+
+# Автоподъём после любого падения — выполненная работа уже в scout.db, не теряется.
+Restart=always
+RestartSec=3
+# Не убивать долгий краулинг слишком резко при ручном рестарте.
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
